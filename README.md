@@ -4,11 +4,25 @@
 
 Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).<BR>
 <BR>
-Please submit bug reports and feature requests [HERE](https://github.com/dl-romero/neptune_exporter/issues/new/choose) or by click the Issues tab in this repository.
+Please submit bug reports and feature requests [HERE](https://github.com/dl-romero/neptune_exporter/issues/new/choose) or by clicking the Issues tab in this repository.
 
 
 This repository contains only the Neptune Exporter.<BR>
 An all in one (Neptune Exporter, Prometheus and Grafana) installer is available at [Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer).
+
+### Requirements
+ - Linux OS.
+  - Confirmed working OS:
+    - Rocky 9
+    - CentOS 7
+ - Python 3.9.18
+  - Python Packages:
+    - fastapi==0.112.1
+    - PyYAML==6.0.2
+    - Requests==2.32.3
+    - selenium==4.23.1
+    - uvicorn==0.30.6
+
 
 ### Download and Installation Instructions
 The below instructions do not include the setup of the required fusion.yml and apex.yml files.<BR>
