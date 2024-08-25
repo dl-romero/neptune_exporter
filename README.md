@@ -10,7 +10,8 @@ pip3 install -r requirements.txt
 sudo mkdir /etc/neptune_exporter
 sudo cp -R apps/neptune_exporter/* /etc/neptune_exporter
 sudo cp apps/neptune_exporter/neptune_exporter.service /etc/systemd/system
-sudo chown <USERNAME>:<USERGROUP> -R /etc/neptune_exporter # Replace <USERNAME>,<USERGROUP> with your actual username and group.
+# In the command below. Replace <USERNAME>,<USERGROUP> with your actual username and group.
+sudo chown <USERNAME>:<USERGROUP> -R /etc/neptune_exporter 
 sudo vi /etc/systemd/system/neptune_exporter.service 
 # Replace <USERNAME> with your actual username.
 # Press Esc key.
