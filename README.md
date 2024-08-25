@@ -48,7 +48,6 @@ sudo systemctl enable neptune_exporter
 sudo systemctl status neptune_exporter
 ```
 <BR>
-
 ### Fusion Configuration
 File Location: configuration/fusion.yml<BR>
 Example:
@@ -64,7 +63,6 @@ After updating this file the service should be restarted
 sudo systemctl restart neptune_exporter
 ```
 <BR>
-
 ### Apex Configuration
 File Location: configuration/apex.yml<BR>
 Example:
