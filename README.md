@@ -59,7 +59,7 @@ fusion:
       username: reef_master # <- Fusion Login Username
       password: i-glue-animals-to-rocks #<- Fusion Login Password 
 ```
-After updating these files run the service should be restarted
+After updating this file the service should be restarted
 ```
 sudo systemctl restart neptune_exporter
 ```
@@ -77,7 +77,7 @@ apex_auths:
     username: 'admin' # <- Apex (local) Login Username
     password: 'i-glue-animals-to-rocks' #<- Apex (local) Login Password 
 ```
-After updating these files run the service should be restarted
+After updating this file the service should be restarted
 ```
 sudo systemctl restart neptune_exporter
 ```
@@ -128,7 +128,7 @@ scrape_configs:
   - target_label: __address__
     replacement: <YOUR NEPTUNE EXPORTERS HOSTNAME HERE>:5006 # <- Replace with your hostname where the Neptune Exporter is hosted.
 ```
-After updating these files run the service should be restarted
+After updating this file the service should be restarted
 ```
 sudo systemctl restart prometheus
 ```
