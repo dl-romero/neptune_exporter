@@ -4,12 +4,16 @@
 
 Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations)
 
-### Installation
+### Download and Installation Instructions
+The below instructions do not include the setup of the required fusion.yml and apex.yml files.<BR>
+See Fusion Configurations and Apex Configuration.
 ```
+wget https://github.com/dl-romero/neptune_exporter/archive/refs/heads/main.zip
+cd neptune_exporter-main
 pip3 install -r requirements.txt
 sudo mkdir /etc/neptune_exporter
-sudo cp -R apps/neptune_exporter/* /etc/neptune_exporter
-sudo cp apps/neptune_exporter/neptune_exporter.service /etc/systemd/system
+sudo cp -R * /etc/neptune_exporter
+sudo cp neptune_exporter.service /etc/systemd/system
 # In the command below. Replace <USERNAME>,<USERGROUP> with your actual username and group.
 sudo chown <USERNAME>:<USERGROUP> -R /etc/neptune_exporter 
 sudo vi /etc/systemd/system/neptune_exporter.service 
@@ -34,6 +38,10 @@ fusion:
       username: reef_master # <- Fusion Login Username
       password: i-glue-animals-to-rocks #<- Fusion Login Password 
 ```
+After updating these files run the service should be restarted
+```
+sudo systemctl restart neptune_exporter
+```
 <BR>
 
 ### Apex Configuration
@@ -47,4 +55,8 @@ apex_auths:
   'new_auth_name': # <- Call this whatever you want just no duplicates. prometheus.yml will this.
     username: 'admin' # <- Apex (local) Login Username
     password: 'i-glue-animals-to-rocks' #<- Apex (local) Login Password 
+```
+After updating these files run the service should be restarted
+```
+sudo systemctl restart neptune_exporter
 ```
