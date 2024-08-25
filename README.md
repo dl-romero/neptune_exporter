@@ -4,7 +4,8 @@
 
 Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations)
 
-This repository contains only the Neptune Exporter. An all in one (Neptune Exporter, Prometheus and Grafana) installer is available at [Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer)
+This repository contains only the Neptune Exporter.<BR>
+An all in one (Neptune Exporter, Prometheus and Grafana) installer is available at [Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer).
 
 ### Download and Installation Instructions
 The below instructions do not include the setup of the required fusion.yml and apex.yml files.<BR>
