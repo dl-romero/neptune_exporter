@@ -16,12 +16,12 @@ An all in one (Neptune Exporter, Prometheus and Grafana) installer is available 
     - Rocky 9
     - CentOS 7
  - Python 3.9.18
-  - Python Packages:
-    - fastapi==0.112.1
-    - PyYAML==6.0.2
-    - Requests==2.32.3
-    - selenium==4.23.1
-    - uvicorn==0.30.6
+    - Python Packages:
+      - fastapi v0.112.1
+      - PyYAML v6.0.2
+      - Requests v2.32.3
+      - selenium v4.23.1
+      - uvicorn v0.30.6
 
 
 ### Download and Installation Instructions
