@@ -1,4 +1,12 @@
 # Neptune Exporter
+A Prometheus Exporter for the Neptune Apex and Neptune Fusion.<br>
+The purpose of thise exporter is to:
+ - Enable Neptune users with the capability to create alternative dashboards and alerting.
+ - Provide the ability to retain data long term.
+ - Provide Multi-Apex-Unit users the ability to compare data between Apex Units.
+ - Enable the capability to create multi-vendor dashbaords.
+
+Neptune provides monitoring and automation solutions to the Marine Aquarists Community.
 
 ### Documentation
 
