@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Split Neptune Exporter off into its own repo.
 - Created seperate AIO installer repo.
 
+### Added
+
+- Debug / Feature Request Data Export. Exports JSON files needed to debug or build upon feature requests.
+
 ## [0.0.1] - 2024-08-23
 
 ### Added
