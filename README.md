@@ -6,7 +6,6 @@ Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Alloc
 <BR>
 Please submit bug reports and feature requests [HERE](https://github.com/dl-romero/neptune_exporter/issues/new/choose) or by clicking the Issues tab in this repository.
 
-
 This repository contains only the Neptune Exporter.<BR>
 An all in one (Neptune Exporter, Prometheus and Grafana) installer is available at [Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer).
 
@@ -22,7 +21,6 @@ An all in one (Neptune Exporter, Prometheus and Grafana) installer is available 
       - Requests v2.32.3
       - selenium v4.23.1
       - uvicorn v0.30.6
-
 
 ### Download and Installation Instructions
 The below instructions do not include the setup of the required fusion.yml and apex.yml files.<BR>
@@ -47,7 +45,7 @@ sudo systemctl start neptune_exporter
 sudo systemctl enable neptune_exporter
 sudo systemctl status neptune_exporter
 ```
-<BR>
+
 ### Fusion Configuration
 File Location: configuration/fusion.yml<BR>
 Example:
@@ -62,7 +60,7 @@ After updating this file the service should be restarted
 ```
 sudo systemctl restart neptune_exporter
 ```
-<BR>
+
 ### Apex Configuration
 File Location: configuration/apex.yml<BR>
 Example:
@@ -79,7 +77,6 @@ After updating this file the service should be restarted
 ```
 sudo systemctl restart neptune_exporter
 ```
-<BR>
 
 ### Prometheus Configuration
 File Location: etc/promethues/prometheus.yml<BR>
