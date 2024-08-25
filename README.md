@@ -65,6 +65,7 @@ After updating these files run the service should be restarted
 sudo systemctl restart neptune_exporter
 ```
 <BR>
+
 ### Prometheus Configuration
 File Location: etc/promethues/prometheus.yml<BR>
 This should be added to your "scrape_configs":
