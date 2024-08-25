@@ -113,6 +113,6 @@ scrape_configs:
 ```
 After updating these files run the service should be restarted
 ```
-sudo systemctl restart neptune_exporter
+sudo systemctl restart prometheus
 ```
 <BR>
