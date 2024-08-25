@@ -10,7 +10,7 @@ assignees: ''
 **Describe the bug**
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+**Export & Upload Data**
 Steps to reproduce the behavior:
 1. Go to '...'
 2. Click on '....'
@@ -27,8 +27,8 @@ If applicable, add screenshots to help explain your problem.
  - Apex Information:
   - Apex Hardware Model: [Example: A3 Apex Jr] 
   - Apex Operating System : [Example: 5.12 7D24] 
- - Module(s): 
-  - Module Type: [Example Trident]
+ - Module Related to problem: 
+  - Module Type: [Example: Trident]
    - Hardware Version [Example: 2]
    - Software Version [Example: 22]
 
