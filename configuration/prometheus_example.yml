@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 300s
+  evaluation_interval: 300s
+
+- job_name: neptune_apex
+  static_configs:
+  - targets: 
+    - 192.168.1.50 # <- Apex System 1
+    - 192.168.1.13 # <- Apex System 2
+    - 192.168.1.8 # <- Apex System 3
+  metrics_path: /metrics/apex
+  params:
+    auth_module:
+    - default # <- This is the name of the apex_auth you added in the apex.yml file.
+  relabel_configs:
+  - source_labels:
+    - __address__
+    target_label: __param_target
+  - source_labels:
+    - __param_target
+    target_label: instance
+  - target_label: __address__
+    replacement: <YOUR LINUX HOSTNAME HERE>:5006 # <- Replace with your hostname where the Neptune Exporter is hosted.
+    
+- job_name: neptune_fusion
+  static_configs:
+  - targets: 
+     - 234j5nliu2345oin2345in2345 # <- These are the Apex IDs you added in the fusion.yml file.
+     - 234j5nliasdfasdfaa45in2345 # <- These are the Apex IDs you added in the fusion.yml file.
+  metrics_path: /metrics/fusion
+  params:
+    data_max_age:
+    - 300 # <- This should be the same as your scrape_interval set at the top of this file.
+  relabel_configs:
+  - source_labels:
+    - __param_target
+    target_label: instance
+  - source_labels:
+    - __address__
+    target_label: __param_fusion_apex_id
+  - target_label: __address__
+    replacement: <YOUR LINUX HOSTNAME HERE>:5006 # <- Replace with your hostname where the Neptune Exporter is hosted.

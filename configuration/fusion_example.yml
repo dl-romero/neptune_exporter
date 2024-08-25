@@ -1,0 +1,8 @@
+fusion:
+  apex_systems:
+    sample_id:
+      username: sample_user
+      password: sample_password
+    234j5nliu2345oin2345in2345: # <- Apex ID from URL. Do not use duplicates.
+      username: reef_master
+      password: i-glue-animals-to-rocks

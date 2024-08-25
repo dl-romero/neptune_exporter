@@ -1,0 +1,7 @@
+apex_auths:
+  'default':
+    username: 'admin'
+    password: '1234'
+  'new_auth_name': # <- Call this whatever you want just no duplicates
+    username: 'admin_new'
+    password: '1234_5'
