@@ -2,7 +2,10 @@
 
 ### Documentation
 
-Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).
+Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).<BR>
+<BR>
+Please submit bug reports and feature requests [HERE](https://github.com/dl-romero/neptune_exporter/issues/new/choose) or by click the Issues tab in this repository.
+
 
 This repository contains only the Neptune Exporter.<BR>
 An all in one (Neptune Exporter, Prometheus and Grafana) installer is available at [Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer).
