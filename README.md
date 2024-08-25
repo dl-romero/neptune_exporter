@@ -12,9 +12,9 @@ An all in one (Neptune Exporter, Prometheus and Grafana) installer is available 
 
 ### Requirements
  - Linux OS.
-  - Confirmed working OS:
-    - Rocky 9
-    - CentOS 7
+    - Confirmed working OS:
+      - Rocky 9
+      - CentOS 7
  - Python 3.9.18
     - Python Packages:
       - fastapi v0.112.1
