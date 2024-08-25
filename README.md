@@ -1,5 +1,18 @@
-# neptune_exporter
+# Neptune Exporter
 
-### <u>Documentation</u>
+### Documentation
 
-Uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations)
+Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations)
+
+### Installation
+
+### Fusion Configuration
+File Location: configuration/fusion.yml
+Example:
+```
+fusion:
+  apex_systems:
+    234j5nliu2345oin2345in2345: # <- Apex ID from URL.
+      username: reef_master # <- Fusion Login Username
+      password: i-glue-animals-to-rocks #<- Fusion Login Password 
+```
