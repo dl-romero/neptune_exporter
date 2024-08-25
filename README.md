@@ -16,3 +16,16 @@ fusion:
       username: reef_master # <- Fusion Login Username
       password: i-glue-animals-to-rocks #<- Fusion Login Password 
 ```
+<BR>
+### Apex Configuration
+File Location: configuration/apex.yml<BR>
+Example:
+```
+apex_auths:
+  'default':
+    username: 'admin'
+    password: '1234'
+  'new_auth_name': # <- Call this whatever you want just no duplicates. prometheus.yml will this.
+    username: 'admin' # <- Apex (local) Login Username
+    password: 'i-glue-animals-to-rocks' #<- Apex (local) Login Password 
+```
