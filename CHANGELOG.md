@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Split Neptune Exporter off into its own repo.
 - Created seperate AIO installer repo.
+- Refactored and cleaned code.
 
 ### Added
 
