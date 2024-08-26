@@ -133,7 +133,7 @@ class FUSION:
         metric_value = str(metric_value) # <- Must be Int or Float.
         metric_labels = ', '.join(metric_labels)
         return "apex_{}{{{}}} {}".format(metric_name, metric_labels, metric_value)
-    
+    C
     def mlog_type_eval(self, log_type):
         """
         Evaluates the log type and returns a more proper name.
@@ -180,7 +180,12 @@ class FUSION:
             return str(sensor_type).lower()
     
     def prometheus_metrics(self):
-        #Collects metrics from Fusion and returns the data in prometheus format.
+        """
+        Generates Prometheus metrics for Fusion.
+
+        Returns:
+            str: The metrics data in Prometheus format.
+        """
         metric_lines = []
         fusion_status = self.get_status()[0]
         apex_id = fusion_status["_id"]
@@ -194,7 +199,7 @@ class FUSION:
             'apex_id="{}"'.format(apex_id),
             'apex_serial="{}"'.format(apex_serial),
             'apex_hostname="{}"'.format(apex_hostname)
-            ]
+        ]
 
         # INFO METRIC
         info_label_values = [
@@ -204,29 +209,29 @@ class FUSION:
             'apex_hardware="{}"'.format(apex_hardware),
             'apex_serial="{}"'.format(apex_serial),
             'apex_hostname="{}"'.format(apex_hostname)
-            ]
+        ]
         metric_lines.append(self.prom_metric_string("info_label_values", info_label_values, 0))
 
         # SD CARD METRICS
         sd_card_data = {
-            "sd_health" : fusion_status["extra"]["sdhealth"],
-            "sd_status_read_error" : fusion_status["extra"]["sdstat"]["readErr"],
-            "sd_status_reads" : fusion_status["extra"]["sdstat"]["reads"],
-            "sd_status_write_error" : fusion_status["extra"]["sdstat"]["writeErr"],
-            "sd_status_writes" : fusion_status["extra"]["sdstat"]["writes"]
-            }
+            "sd_health": fusion_status["extra"]["sdhealth"],
+            "sd_status_read_error": fusion_status["extra"]["sdstat"]["readErr"],
+            "sd_status_reads": fusion_status["extra"]["sdstat"]["reads"],
+            "sd_status_write_error": fusion_status["extra"]["sdstat"]["writeErr"],
+            "sd_status_writes": fusion_status["extra"]["sdstat"]["writes"]
+        }
         for metric_name, metric_value in sd_card_data.items():
             metric_lines.append(self.prom_metric_string(metric_name, base_label_values, metric_value))
 
         # SENSOR METRICS
         apex_inputs = fusion_status["status"]["inputs"]
         for apex_input in apex_inputs:
-            input_label_values =[
-            'data_source="apex"',
-            'did="{}"'.format(apex_input["did"]), #Ex: "3_2"
-            'type="{}"'.format(apex_input["type"]), #Ex: "mg"
-            'name="{}"'.format(self.sensor_type_eval(apex_input["name"])) #Ex: "Mg"
-            #'value="{}"'.format(apex_input["value"]), #Ex: 1586
+            input_label_values = [
+                'data_source="apex"',
+                'did="{}"'.format(apex_input["did"]),  # Ex: "3_2"
+                'type="{}"'.format(apex_input["type"]),  # Ex: "mg"
+                'name="{}"'.format(self.sensor_type_eval(apex_input["name"]))  # Ex: "Mg"
+                # 'value="{}"'.format(apex_input["value"]), #Ex: 1586
             ]
             combined_labels = base_label_values + input_label_values
             apex_input_value = apex_input["value"]
@@ -244,18 +249,18 @@ class FUSION:
         else:
             alarm_value = 2
         metric_lines.append(self.prom_metric_string("alarm", combined_labels, alarm_value))
-        
+
         # MODULE METRICS
         apex_modules = fusion_status["status"]["modules"]
         for apex_module in apex_modules:
-            apex_module_ab_address = apex_module["abaddr"] # EX: 2
-            apex_module_type = apex_module["hwtype"] # "DQD"
-            apex_module_status = apex_module["swstat"] # "OK"
-            apex_module_present = apex_module["present"] # true
+            apex_module_ab_address = apex_module["abaddr"]  # EX: 2
+            apex_module_type = apex_module["hwtype"]  # "DQD"
+            apex_module_status = apex_module["swstat"]  # "OK"
+            apex_module_present = apex_module["present"]  # true
             module_labels = ['module_type="{}"'.format(apex_module_type),
                              'module_port="{}"'.format(apex_module_ab_address),
                              'module_values="1 is Ok/True, 0 is Not Ok/False, 2 is metric issue"'
-                            ]
+                             ]
             combined_labels = base_label_values + module_labels
             if apex_module_status == "OK":
                 apex_module_status_value = 1
@@ -269,7 +274,7 @@ class FUSION:
                 apex_module_present_value = 2
             metric_lines.append(self.prom_metric_string("module_present", combined_labels, apex_module_present_value))
 
-        # APEX NETWORK    
+        # APEX NETWORK
         apex_network_quality = fusion_status["status"]["network"]["quality"]
         metric_lines.append(self.prom_metric_string("network_quality_pct", base_label_values, apex_network_quality))
         apex_network_strength = fusion_status["status"]["network"]["strength"]
@@ -279,61 +284,65 @@ class FUSION:
         fusion_measurement_log = self.get_measurement_log()
         latest_measurements = {}
         for log_entry in fusion_measurement_log:
-            log_date = log_entry["date"] # Ex: 2024-08-19T04:20:38.184Z
+            log_date = log_entry["date"]  # Ex: 2024-08-19T04:20:38.184Z
             log_type = log_entry["type"]
             log_name = log_entry["name"]
             log_value = log_entry["value"]
 
             try:
                 log_timestamp_utc = datetime.datetime.strptime(str(log_date) + "+0000", "%Y-%m-%dT%H:%M:%S.%fZ%z")
-                current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC)-datetime.timedelta(seconds=self.max_data_age)
+                current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+                    seconds=self.max_data_age)
                 if log_timestamp_utc <= current_timestamp_delta_utc:
                     continue
             except:
                 log_timestamp_utc = datetime.datetime.strptime(str(log_date), "%Y-%m-%dT%H:%M:%S.%fZ")
-                current_timestamp_delta_utc = datetime.datetime.utcnow()-datetime.timedelta(seconds=self.max_data_age)
+                current_timestamp_delta_utc = datetime.datetime.utcnow() - datetime.timedelta(
+                    seconds=self.max_data_age)
                 if log_timestamp_utc <= current_timestamp_delta_utc:
                     continue
 
             if log_type in [1, 2, 3, 4, 5, 6]:
                 log_name = str(str(self.mlog_type_eval(log_type)).lower()).replace(" ", "_")
                 if str(log_name) not in latest_measurements:
-                    latest_measurements[str(log_name)]={
-                        "date" : log_date,
-                        "type" : log_type,
-                        "name" : log_name,
-                        "value" : log_value
+                    latest_measurements[str(log_name)] = {
+                        "date": log_date,
+                        "type": log_type,
+                        "name": log_name,
+                        "value": log_value
                     }
                 else:
-                    current_ts_string = datetime.datetime.strptime(latest_measurements[str(log_name)]["date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+                    current_ts_string = datetime.datetime.strptime(latest_measurements[str(log_name)]["date"],
+                                                                   "%Y-%m-%dT%H:%M:%S.%fZ")
                     incoming_ts_string = datetime.datetime.strptime(log_date, "%Y-%m-%dT%H:%M:%S.%fZ")
                     if current_ts_string < incoming_ts_string:
-                        latest_measurements[str(log_name)]={
-                        "date" : log_date,
-                        "type" : log_type,
-                        "name" : log_name,
-                        "value" : log_value
-                    }
+                        latest_measurements[str(log_name)] = {
+                            "date": log_date,
+                            "type": log_type,
+                            "name": log_name,
+                            "value": log_value
+                        }
 
             if log_type in [0]:
                 log_name = str(str(log_name)).lower().replace(" ", "_")
                 if str(log_name) not in latest_measurements:
-                    latest_measurements[str(log_name)]={
-                        "date" : log_date,
-                        "type" : log_type,
-                        "name" : log_name,
-                        "value" : log_value
+                    latest_measurements[str(log_name)] = {
+                        "date": log_date,
+                        "type": log_type,
+                        "name": log_name,
+                        "value": log_value
                     }
                 else:
-                    current_ts_string = datetime.datetime.strptime(latest_measurements[str(log_name)]["date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+                    current_ts_string = datetime.datetime.strptime(latest_measurements[str(log_name)]["date"],
+                                                                   "%Y-%m-%dT%H:%M:%S.%fZ")
                     incoming_ts_string = datetime.datetime.strptime(log_date, "%Y-%m-%dT%H:%M:%S.%fZ")
                     if current_ts_string < incoming_ts_string:
-                        latest_measurements[str(log_name)]={
-                        "date" : log_date,
-                        "type" : log_type,
-                        "name" : log_name,
-                        "value" : log_value
-                    }
+                        latest_measurements[str(log_name)] = {
+                            "date": log_date,
+                            "type": log_type,
+                            "name": log_name,
+                            "value": log_value
+                        }
         for latest_measurement_item, latest_measurement_item_dict in latest_measurements.items():
             log_entry_labels = [
                 'data_source="measurement_log"',
