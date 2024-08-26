@@ -13,7 +13,17 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.chrome.options import Options
 
 def setup_logger(name, log_file, level=logging.INFO):
-    # Setup logging machanism
+    """
+    Set up a logger with the specified name, log file, and log level.
+
+    Args:
+        name (str): The name of the logger.
+        log_file (str): The path to the log file.
+        level (int, optional): The log level. Defaults to logging.INFO.
+
+    Returns:
+        logging.Logger: The configured logger.
+    """
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     handler = logging.FileHandler(log_file)        
     handler.setFormatter(formatter)
@@ -26,10 +36,10 @@ application_logger = setup_logger('neptune_fusion', str(os.path.dirname(__file__
 
 try:
     loaded_cfg_file = str(os.path.dirname(__file__)) + "/../configuration/" + "fusion.yml"
-    config_file = open(loaded_cfg_file, 'r')
-    configuration = yaml.load(config_file, Loader=yaml.Loader)
-except:
-    application_logger.error('Configuration File Load Failed')
+    with open(loaded_cfg_file, 'r') as config_file:
+        configuration = yaml.load(config_file, Loader=yaml.Loader)
+except Exception as e:
+    application_logger.error('Configuration File Load Failed: {}'.format(str(e)))
     exit()
 
 class FUSION:
@@ -37,20 +47,32 @@ class FUSION:
     This class uses webscraping to authenticate into FUSION and query APIs that are dynamically built using JS. Unlike a direct APEX (local) API.
     """
     def __init__(self, fusion_apex_id, max_data_age):
-        # Initializes the web-scraper and gets stored credentials.
+        """
+        Initializes the web-scraper and gets stored credentials.
+
+        Args:
+            fusion_apex_id (str): The ID of the Fusion Apex system.
+            max_data_age (int): The maximum age of data to retrieve.
+
+        """
         chrome_options = Options()
         chrome_options.add_argument("--headless=new")
         self.driver = webdriver.Chrome(options=chrome_options)
         self.fusion_login(configuration["fusion"]["apex_systems"][fusion_apex_id]["username"], 
                           configuration["fusion"]["apex_systems"][fusion_apex_id]["password"])
         self.fusion_apex_id = fusion_apex_id
-        self.max_data_age = int(max_data_age) + 60 # 1m grace period to acount for scrape time.
+        self.max_data_age = int(max_data_age) + 60 # 1m grace period to account for scrape time.
 
-    def fusion_login(self, username , password):
-        # Logs into Fusion.
+    def fusion_login(self, username, password):
+        """
+        Logs into Fusion.
+
+        Args:
+            username (str): The username for authentication.
+            password (str): The password for authentication.
+        """
         self.driver.get('https://apexfusion.com/login')
         id_box = WebDriverWait(self.driver, 30).until(expected_conditions.presence_of_element_located((By.ID, 'index-login-username')))
-        self.driver.find_element(By.ID, 'index-login-username')
         id_box.send_keys(str(username))
         pass_box = self.driver.find_element(By.ID, 'index-login-password')
         pass_box.send_keys(str(password))
@@ -58,7 +80,12 @@ class FUSION:
         self.driver.implicitly_wait(3)
 
     def get_measurement_log(self):
-        # Gets the measurement log from Fusion.
+        """
+        Gets the measurement log from Fusion.
+
+        Returns:
+            dict: The measurement log data in JSON format.
+        """
         mlog_url = "https://apexfusion.com/api/apex/{}/mlog?days=1".format(str(self.fusion_apex_id))
         self.driver.get(mlog_url)
         self.driver.implicitly_wait(3)
@@ -72,7 +99,12 @@ class FUSION:
         return html_to_json
     
     def get_status(self):
-        # Gets the status data from Fusion.
+        """
+        Gets the status data from Fusion.
+
+        Returns:
+            dict: The status data in JSON format.
+        """
         mlog_url = "https://apexfusion.com/api/apex?page=1&per_page=9999".format(str(self.fusion_apex_id))
         self.driver.get(mlog_url)
         self.driver.implicitly_wait(3)
@@ -86,38 +118,64 @@ class FUSION:
         return html_to_json
     
     def prom_metric_string(self, metric_name, metric_labels, metric_value):
-        # Formats the metric string properly for Prometheus to read.
+        """
+        Formats the metric string properly for Prometheus to read.
+
+        Args:
+            metric_name (str): The name of the metric.
+            metric_labels (list): The labels associated with the metric.
+            metric_value (int or float): The value of the metric.
+
+        Returns:
+            str: The formatted metric string for Prometheus.
+        """
         metric_name = str(metric_name).lower()
         metric_value = str(metric_value) # <- Must be Int or Float.
         metric_labels = ', '.join(metric_labels)
         return "apex_{}{{{}}} {}".format(metric_name, metric_labels, metric_value)
     
     def mlog_type_eval(self, log_type):
-        # Evaluates the log type and returns a more proper name.
+        """
+        Evaluates the log type and returns a more proper name.
+
+        Args:
+            log_type (int): The type of the log.
+
+        Returns:
+            str: The proper name for the log type.
+        """
         if log_type == 1:
-            return "ALKALINITY"
+            return "alkalinity"
         elif log_type == 2:
-            return "CALCIUM"
+            return "calcium"
         elif log_type == 3:
-            return "IODINE"
+            return "iodine"
         elif log_type == 4:
-            return "MAGNESIUM"
+            return "magnesium"
         elif log_type == 5:
-            return "NITRATE"
+            return "nitrate"
         elif log_type == 6:
-            return "PHOSPHATE"
+            return "phosphate"
         else:
-            return "OTHER"
+            return "other"
         
     def sensor_type_eval(self, sensor_type):
-        # Evaluates the sensor type and returns a more proper name.
+        """
+        Evaluates the sensor type and returns a more proper name.
+
+        Args:
+            sensor_type (str): The type of the sensor.
+
+        Returns:
+            str: The proper name for the sensor type.
+        """
         sensor_type = str(sensor_type).lower()
         if sensor_type == "alk":
-            return "ALKALINITY".lower()
+            return "alkalinity"
         elif sensor_type == "ca":
-            return "CALCIUM".lower()
+            return "calcium"
         elif sensor_type == "mg":
-            return "MAGNESIUM".lower()
+            return "magnesium"
         else:
             return str(sensor_type).lower()
     

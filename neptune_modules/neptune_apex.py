@@ -13,7 +13,15 @@ import os
 
 def setup_logger(name, log_file, level=logging.INFO):
     """
-    Setup logging mechanism.
+    Set up a logger with the specified name, log file, and log level.
+
+    Args:
+        name (str): The name of the logger.
+        log_file (str): The path to the log file.
+        level (int, optional): The log level. Defaults to logging.INFO.
+
+    Returns:
+        logging.Logger: The configured logger.
     """
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     handler = logging.FileHandler(log_file)
@@ -283,7 +291,7 @@ class APEX:
         Generates Prometheus metrics for the Neptune Apex device.
 
         Returns:
-            str: A string containing the Prometheus metrics.
+            str: The metrics data in Prometheus format.
         """
         metric_lines = []
         apex_status = self.status()
