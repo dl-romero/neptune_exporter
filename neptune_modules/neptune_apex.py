@@ -43,7 +43,7 @@ except Exception as e:
     exit()
 
 class APEX:
-    def __init__(self, apex_ip, auth_module):
+    def __init__(self, apex_ip, auth_module, apex_debug=False):
         """
         Initializes the APEX class.
         Parameters:
@@ -66,6 +66,8 @@ class APEX:
         self.apex_user = str(configuration["apex_auths"][auth_module]["username"])
         self.apex_password = str(configuration["apex_auths"][auth_module]["password"])
         self.session_cookie = ""
+        self.apex_debug = apex_debug
+
 
     def authentication(self):
         """

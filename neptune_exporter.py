@@ -6,6 +6,7 @@ import time
 import math
 import socket
 import os
+import glob
 import requests
 from pathlib import Path
 import uvicorn
@@ -129,6 +130,9 @@ async def apex_exporter_logs():
     """
     log_directory = os.path.join(os.path.dirname(__file__), 'logs')
     workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
+    files = glob.glob('{}/*'.format(workspace_directory))
+    for f in files:
+        os.remove(f)
     file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     file_name = f"neptune_exporter-logs.{file_name_ts}"
     shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=log_directory)
@@ -136,12 +140,49 @@ async def apex_exporter_logs():
 
 @app.get("/export/apex/", response_class=PlainTextResponse, tags=["Export Apex JSON Files"])
 async def apex_exporter_logs(target, auth_module):
-    pass
+    workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
+    files = glob.glob('{}/*'.format(workspace_directory))
+    for f in files:
+        os.remove(f)
+
+    apex_direct = neptune_apex.APEX(apex_ip=target, auth_module=auth_module, apex_debug = True)
+    # Status JSON
+    with open("status.json", "w") as data_file:
+        json.dump(apex_direct.status(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+    
+    # ILOG JSON
+    with open("ilog.json", "w") as data_file:
+        json.dump(apex_direct.internal_log(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+
+    # DOS JSON
+    with open("dlog.json", "w") as data_file:
+        json.dump(apex_direct.dos_log(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+
+    # Trident JSON
+    with open("tlog.json", "w") as data_file:
+        json.dump(apex_direct.trident_log(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+
+    # Config JSON
+    with open("config.json", "w") as data_file:
+        json.dump(apex_direct.trident_log(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+
+    file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_name = f"neptune_apex-json.{file_name_ts}"
+    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=workspace_directory)
+    return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
 
 @app.get("/export/fusion/", response_class=PlainTextResponse, tags=["Export Fusion JSON Files"])
 async def apex_exporter_logs(fusion_apex_id):
-    pass
-
+    workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
+    files = glob.glob('{}/*'.format(workspace_directory))
+    for f in files:
+        os.remove(f)
+    apex_fusion = neptune_fusion.FUSION(fusion_apex_id, 999999999999)
 
 @app.get("/", include_in_schema=False)
 async def documentation_home_page():
