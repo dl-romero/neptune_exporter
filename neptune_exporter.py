@@ -11,10 +11,14 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.responses import PlainTextResponse, RedirectResponse
+from starlette.responses import FileResponse
 import yaml
 from neptune_modules import neptune_apex
 from neptune_modules import neptune_fusion
 import logging.config
+import zipfile
+import shutil
+import datetime
 
 def setup_logger(name, log_file, level=logging.INFO):
     """
@@ -69,8 +73,16 @@ app = FastAPI(
             "description": "Get Fusion Metrics in Prometheus Format",
         },
         {
-            "name": "Logs",
-            "description": "View Apex Exporter Logs",
+            "name": "Export Logs",
+            "description": "Download Logs & JSON data.",
+        },
+        {
+            "name": "Export Apex JSON Files",
+            "description": "Download Apex JSON data.",
+        },
+        {
+            "name": "Export Fusion JSON Files",
+            "description": "Download Fusion JSON data.",
         }
     ]
 )
@@ -105,23 +117,31 @@ async def fusion_prometheus_metrics(data_max_age, fusion_apex_id):
     apex_fusion = neptune_fusion.FUSION(fusion_apex_id, data_max_age)
     return apex_fusion.prometheus_metrics()
 
-@app.get("/logs/", response_class=PlainTextResponse, tags=["Logs"])
-async def apex_exporter_logs(log_file_name):
+@app.get("/export/logs/", response_class=PlainTextResponse, tags=["Export Log Data"])
+async def apex_exporter_logs():
     """
-    View Apex Exporter logs.
+    Export and download logs.
 
-    Args:
-        log_file_name (str): The name of the log file.
+    This function creates a zip archive of the logs directory and returns it as a FileResponse object.
 
     Returns:
-        str: The contents of the log file.
+        FileResponse: The zip archive containing the logs.
     """
-    if log_file_name in ['neptune.log', 'exporter.log', 'apex.log']:
-        log_file = str(os.path.dirname(__file__)) + '/logs/' + 'neptune_exporter.log'
-        with open(log_file, "r") as open_file:
-            return "".join(open_file.readlines())
-    else:
-        return "Log name not found. Use one of ('neptune.log', 'exporter.log', 'apex.log') without any quotes."
+    log_directory = os.path.join(os.path.dirname(__file__), 'logs')
+    workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
+    file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_name = f"neptune_exporter-logs.{file_name_ts}"
+    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=log_directory)
+    return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
+
+@app.get("/export/apex/", response_class=PlainTextResponse, tags=["Export Apex JSON Files"])
+async def apex_exporter_logs(target, auth_module):
+    pass
+
+@app.get("/export/fusion/", response_class=PlainTextResponse, tags=["Export Fusion JSON Files"])
+async def apex_exporter_logs(fusion_apex_id):
+    pass
+
 
 @app.get("/", include_in_schema=False)
 async def documentation_home_page():

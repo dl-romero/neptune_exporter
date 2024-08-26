@@ -133,7 +133,7 @@ class FUSION:
         metric_value = str(metric_value) # <- Must be Int or Float.
         metric_labels = ', '.join(metric_labels)
         return "apex_{}{{{}}} {}".format(metric_name, metric_labels, metric_value)
-    C
+
     def mlog_type_eval(self, log_type):
         """
         Evaluates the log type and returns a more proper name.
