@@ -46,7 +46,7 @@ class FUSION:
     """
     This class uses webscraping to authenticate into FUSION and query APIs that are dynamically built using JS. Unlike a direct APEX (local) API.
     """
-    def __init__(self, fusion_apex_id, max_data_age):
+    def __init__(self, fusion_apex_id, max_data_age, fusion_debug=False):
         """
         Initializes the web-scraper and gets stored credentials.
 
@@ -55,6 +55,9 @@ class FUSION:
             max_data_age (int): The maximum age of data to retrieve.
 
         """
+        # Going forward if a date range is need as a url pram. implement an fusion_debug check.
+        # Include at least 1-7 days of data.
+        self.fusion_debug = fusion_debug
         chrome_options = Options()
         chrome_options.add_argument("--headless=new")
         self.driver = webdriver.Chrome(options=chrome_options)
@@ -86,7 +89,10 @@ class FUSION:
         Returns:
             dict: The measurement log data in JSON format.
         """
-        mlog_url = "https://apexfusion.com/api/apex/{}/mlog?days=1".format(str(self.fusion_apex_id))
+        if self.fusion_debug == True:
+            mlog_url = "https://apexfusion.com/api/apex/{}/mlog?days=365".format(str(self.fusion_apex_id))
+        else:
+            mlog_url = "https://apexfusion.com/api/apex/{}/mlog?days=1".format(str(self.fusion_apex_id))
         self.driver.get(mlog_url)
         self.driver.implicitly_wait(3)
         self.driver.refresh()
@@ -105,7 +111,7 @@ class FUSION:
         Returns:
             dict: The status data in JSON format.
         """
-        mlog_url = "https://apexfusion.com/api/apex?page=1&per_page=9999".format(str(self.fusion_apex_id))
+        mlog_url = "https://apexfusion.com/api/apex?page=1&per_page=9999"
         self.driver.get(mlog_url)
         self.driver.implicitly_wait(3)
         self.driver.refresh()

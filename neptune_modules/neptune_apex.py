@@ -52,6 +52,7 @@ class APEX:
 
             Attributes:
             - epoch_current (int): The current epoch time.
+            - date_string (str): The current date.
             - epoch_past (int): The epoch time 5 minutes ago.
             - apex_ip (str): The IP address of the APEX device.
             - auth_module (str): The authentication module to use for APEX.
@@ -59,7 +60,10 @@ class APEX:
             - apex_password (str): The password for APEX authentication.
             - session_cookie (str): The session cookie for APEX authentication.
         """
+        # Going forward if a date range is need as a url pram. implement an apex_debug check.
+        # Include at least 1-7 days of data.
         self.epoch_current = math.ceil(time.time())
+        self.date_string = time.strftime("%Y-%m-%d")
         self.epoch_past = math.ceil(time.time()) - (60 * 5)
         self.apex_ip = apex_ip
         self.auth_module = auth_module
@@ -147,7 +151,10 @@ class APEX:
                 self.authentication()
             except Exception as auth_error:
                 application_logger.error('Apex Authentication Error: {}'.format(auth_error))
-        url = "http://{}/rest/ilog?days=1&sdate=0&_={}".format(self.apex_ip, self.epoch_current)
+        if self.apex_debug == True:
+            url = "http://{}/rest/ilog?days=365".format(self.apex_ip)
+        else:
+            url = "http://{}/rest/ilog?days=1&sdate=0&_={}".format(self.apex_ip, self.epoch_current)
         payload = {}
         headers = {
             'Content-Type': 'application/json',
@@ -181,7 +188,10 @@ class APEX:
                 self.authentication()
             except Exception as auth_error:
                 application_logger.error('Apex Authentication Error: {}'.format(auth_error))
-        url = "http://{}/rest/dlog?days=1&sdate=0&_={}".format(self.apex_ip, self.epoch_current)
+        if self.apex_debug == True:
+            url = "http://{}/rest/dlog?sdate={}&".format(self.apex_ip, self.date_string)
+        else:
+            url = "http://{}/rest/dlog?days=1&sdate=0&_={}".format(self.apex_ip, self.epoch_current)
         payload = {}
         headers = {
             'Content-Type': 'application/json',
@@ -218,7 +228,10 @@ class APEX:
                 self.authentication()
             except Exception as auth_error:
                 application_logger.error('Apex Authentication Error: {}'.format(auth_error))
-        url = "http://{}/rest/tlog?days=1&sdate=0&_={}".format(self.apex_ip, self.epoch_current)
+        if self.apex_debug == True:
+            url = "http://{}/rest/tlog?days=7&sdate={}".format(self.apex_ip, self.date_string)
+        else:
+            url = "http://{}/rest/tlog?days=1&sdate=0&_={}".format(self.apex_ip, self.epoch_current)
         payload = {}
         headers = {
             'Content-Type': 'application/json',

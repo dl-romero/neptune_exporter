@@ -1,1 +1,14 @@
-# Reserverd for future use
+neptune_exporter:
+  title: Neptune Exporter
+  summary: Prometheus Exporter for the Neptune Apex.
+  description: https://github.com/dl-romero/apex_exporter
+  version: 1.0
+  contact:
+    name: dromero.dev
+    url: https://dromero.dev
+  license_info:
+    name: License
+    url: https://github.com/dl-romero/apex_exporter/blob/main/LICENSE
+  
+fusion_module:
+apex_module:

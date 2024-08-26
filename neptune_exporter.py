@@ -52,7 +52,7 @@ except:
     exit()
 
 app = FastAPI(
-    title="Apex Exporter",
+    title="Neptune Exporter",
     summary="Prometheus Exporter for the Neptune Apex.",
     description="https://github.com/dl-romero/apex_exporter",
     version="1.0",
@@ -75,7 +75,7 @@ app = FastAPI(
         },
         {
             "name": "Export Logs",
-            "description": "Download Logs & JSON data.",
+            "description": "Download Neptune Exporter Log data.",
         },
         {
             "name": "Export Apex JSON Files",
@@ -139,50 +139,106 @@ async def apex_exporter_logs():
     return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
 
 @app.get("/export/apex/", response_class=PlainTextResponse, tags=["Export Apex JSON Files"])
-async def apex_exporter_logs(target, auth_module):
-    workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
+async def export_apex_json(target, auth_module):
+    # Defining Work Space
+    workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
+
+    # Check Workspace Lock / Lock Workspace
+    if os.path.isfile(workspace_directory + "/WORKSPACE_LOCKED") == True:
+        return "Export Workspace Locked. Please run 1 export at a time."
+    else:
+        with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
+            lock_file.close()
+
+    # Cleaning Work Space
     files = glob.glob('{}/*'.format(workspace_directory))
     for f in files:
         os.remove(f)
 
+    # Creating JSON Folder
+    temp_files_folder = os.path.join(workspace_directory, "temp_files")
+    os.mkdir(temp_files_folder)
+
+    # Setting up Neptune Apex Class in Debug Mode
     apex_direct = neptune_apex.APEX(apex_ip=target, auth_module=auth_module, apex_debug = True)
+    
     # Status JSON
-    with open("status.json", "w") as data_file:
+    with open(os.path.join(temp_files_folder, "status.json"), "w") as data_file:
         json.dump(apex_direct.status(), data_file, indent=4, sort_keys=True)
         data_file.close()
     
     # ILOG JSON
-    with open("ilog.json", "w") as data_file:
+    with open(os.path.join(temp_files_folder, "ilog.json"), "w") as data_file:
         json.dump(apex_direct.internal_log(), data_file, indent=4, sort_keys=True)
         data_file.close()
 
     # DOS JSON
-    with open("dlog.json", "w") as data_file:
+    with open(os.path.join(temp_files_folder, "dlog.json"), "w") as data_file:
         json.dump(apex_direct.dos_log(), data_file, indent=4, sort_keys=True)
         data_file.close()
 
     # Trident JSON
-    with open("tlog.json", "w") as data_file:
+    with open(os.path.join(temp_files_folder, "tlog.json"), "w") as data_file:
         json.dump(apex_direct.trident_log(), data_file, indent=4, sort_keys=True)
         data_file.close()
 
     # Config JSON
-    with open("config.json", "w") as data_file:
+    with open(os.path.join(temp_files_folder, "config.json"), "w") as data_file:
         json.dump(apex_direct.trident_log(), data_file, indent=4, sort_keys=True)
         data_file.close()
 
+    # Compress files in workspace/temp_files. Zip is located in workspace
     file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     file_name = f"neptune_apex-json.{file_name_ts}"
     shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=workspace_directory)
+
+    # Remove Workspace Lock and Provide Download
+    os.remove(workspace_directory + "/WORKSPACE_LOCKED")
     return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
 
 @app.get("/export/fusion/", response_class=PlainTextResponse, tags=["Export Fusion JSON Files"])
-async def apex_exporter_logs(fusion_apex_id):
-    workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
+async def export_fusion_json(fusion_apex_id):
+    # Defining Work Space
+    workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
+
+    # Check Workspace Lock / Lock Workspace
+    if os.path.isfile(workspace_directory + "/WORKSPACE_LOCKED") == True:
+        return "Export Workspace Locked. Please run 1 export at a time."
+    else:
+        with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
+            lock_file.close()
+
+    # Cleaning Work Space
     files = glob.glob('{}/*'.format(workspace_directory))
     for f in files:
         os.remove(f)
-    apex_fusion = neptune_fusion.FUSION(fusion_apex_id, 999999999999)
+
+    # Creating JSON Folder
+    temp_files_folder = os.path.join(workspace_directory, "temp_files")
+    os.mkdir(temp_files_folder)
+
+    # Setting up Neptune Fusion Class in Debug Mode
+    neptune_fusion_direct = neptune_fusion.FUSION(fusion_apex_id, 31536000, fusion_debug=True)
+
+    # Measurement Log JSON
+    with open(os.path.join(temp_files_folder, "mlog.json"), "w") as data_file:
+        json.dump(neptune_fusion_direct.get_measurement_log(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+
+    # Status JSON
+    with open(os.path.join(temp_files_folder, "status.json"), "w") as data_file:
+        json.dump(neptune_fusion_direct.get_status(), data_file, indent=4, sort_keys=True)
+        data_file.close()
+
+    # Compress files in workspace/temp_files. Zip is located in workspace
+    file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_name = f"neptune_fusion-json.{file_name_ts}"
+    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=workspace_directory)
+
+    # Remove Workspace Lock and Provide Download
+    os.remove(workspace_directory + "/WORKSPACE_LOCKED")
+    return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
+
 
 @app.get("/", include_in_schema=False)
 async def documentation_home_page():
