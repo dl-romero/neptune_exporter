@@ -2,12 +2,9 @@
 Neptune Apex Exporter for Prometheus.
 """
 import json
-import time
-import math
 import socket
 import os
 import glob
-import requests
 from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, Response, status, HTTPException
@@ -17,7 +14,6 @@ import yaml
 from neptune_modules import neptune_apex
 from neptune_modules import neptune_fusion
 import logging.config
-import zipfile
 import shutil
 import datetime
 
@@ -89,6 +85,12 @@ app = FastAPI(
 )
 
 def clean_workspace():
+    """
+    Cleans the workspace directory by removing all files and directories within it.
+    Returns:
+        bool: True if the workspace is successfully cleaned, False if the workspace is locked.
+    """
+
     # Defining Work Space
     workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
 
@@ -109,6 +111,15 @@ def clean_workspace():
     return True
 
 def is_file_older_than(file, delta): 
+    """
+    Checks if a file is older than a specified time delta.
+    Args:
+        file (str): The path to the file.
+        delta (datetime.timedelta): The time delta to compare against.
+    Returns:
+        bool: True if the file is older than the specified time delta, False otherwise.
+    """
+
     cutoff = datetime.datetime.utcnow() - delta
     mtime = datetime.datetime.utcfromtimestamp(os.path.getmtime(file))
     if mtime < cutoff:
@@ -180,6 +191,18 @@ async def apex_exporter_logs():
 
 @app.get("/export/apex/", response_class=PlainTextResponse, tags=["Export Apex JSON Files"])
 async def export_apex_json(target, auth_module):
+    """
+    Export Apex JSON data from Neptune Apex device.
+    Args:
+        target (str): The IP address of the Neptune Apex device.
+        auth_module (str): The authentication module to be used.
+    Returns:
+        FileResponse: The response containing the exported JSON data in a zip file.
+    Raises:
+        FileNotFoundError: If the workspace directory or any required files are not found.
+        Exception: If the workspace is locked or an error occurs during the export process.
+    """
+
     # Defining Work Space
     workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
 
@@ -238,6 +261,17 @@ async def export_apex_json(target, auth_module):
 
 @app.get("/export/fusion/", response_class=PlainTextResponse, tags=["Export Fusion JSON Files"])
 async def export_fusion_json(fusion_apex_id):
+    """
+    Export Fusion JSON data.
+    Args:
+        fusion_apex_id (str): The ID of the Fusion Apex.
+    Returns:
+        FileResponse: The response containing the exported JSON data in a zip file.
+    Raises:
+        FileNotFoundError: If the workspace directory or any required files are not found.
+        Exception: If the workspace is locked or an error occurs during the export process.
+    """
+
     # Defining Work Space
     workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
 
