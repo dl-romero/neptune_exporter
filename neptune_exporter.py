@@ -88,6 +88,33 @@ app = FastAPI(
     ]
 )
 
+def clean_workspace():
+    # Defining Work Space
+    workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
+
+    # Check Workspace Lock / Lock Workspace
+    if os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
+        return False
+
+    # Cleaning Work Space
+    files = glob.glob('{}/*'.format(workspace_directory))
+    for f in files:
+        if os.path.isfile(f):
+            os.remove(f)
+        if os.path.isdir(f):
+            try:
+                os.rmdir(f)
+            except:
+                shutil.rmtree(f)
+    return True
+
+def is_file_older_than(file, delta): 
+    cutoff = datetime.datetime.utcnow() - delta
+    mtime = datetime.datetime.utcfromtimestamp(os.path.getmtime(file))
+    if mtime < cutoff:
+        return True
+    return False
+
 @app.get("/metrics/apex", response_class=PlainTextResponse, tags=["Apex"])
 async def apex_prometheus_metrics(target, auth_module):
     """
@@ -130,12 +157,25 @@ async def apex_exporter_logs():
     """
     log_directory = os.path.join(os.path.dirname(__file__), 'logs')
     workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
-    files = glob.glob('{}/*'.format(workspace_directory))
-    for f in files:
-        os.remove(f)
+    
+    # Check Workspace Lock / Lock Workspace
+    if is_file_older_than(workspace_directory + "/WORKSPACE_LOCKED", datetime.timedelta(seconds=300)) == False or os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
+        return "Export Workspace Locked. Please run 1 export at a time.\nIf an error occurred and the lock is still in place. Wait 5 minutes and try again."
+    
+    # Cleaning Work Space
+    clean_workspace()
+
+    # Locking Workspace
+    with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
+        lock_file.close()
+
+    # Compress files in workspace/temp_files. Zip is located in workspace
     file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     file_name = f"neptune_exporter-logs.{file_name_ts}"
     shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=log_directory)
+
+    # Remove Workspace Lock and Provide Download
+    os.remove(workspace_directory + "/WORKSPACE_LOCKED")
     return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
 
 @app.get("/export/apex/", response_class=PlainTextResponse, tags=["Export Apex JSON Files"])
@@ -144,20 +184,20 @@ async def export_apex_json(target, auth_module):
     workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
 
     # Check Workspace Lock / Lock Workspace
-    if os.path.isfile(workspace_directory + "/WORKSPACE_LOCKED") == True:
-        return "Export Workspace Locked. Please run 1 export at a time."
-    else:
-        with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
-            lock_file.close()
+    if is_file_older_than(workspace_directory + "/WORKSPACE_LOCKED", datetime.timedelta(seconds=300)) == False or os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
+        return "Export Workspace Locked. Please run 1 export at a time.\nIf an error occurred and the lock is still in place. Wait 5 minutes and try again."
 
     # Cleaning Work Space
-    files = glob.glob('{}/*'.format(workspace_directory))
-    for f in files:
-        os.remove(f)
+    clean_workspace()
+
+    # Locking Workspace
+    with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
+        lock_file.close()
 
     # Creating JSON Folder
     temp_files_folder = os.path.join(workspace_directory, "temp_files")
-    os.mkdir(temp_files_folder)
+    if os.path.isdir(temp_files_folder) == False:
+        os.mkdir(temp_files_folder)
 
     # Setting up Neptune Apex Class in Debug Mode
     apex_direct = neptune_apex.APEX(apex_ip=target, auth_module=auth_module, apex_debug = True)
@@ -190,7 +230,7 @@ async def export_apex_json(target, auth_module):
     # Compress files in workspace/temp_files. Zip is located in workspace
     file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     file_name = f"neptune_apex-json.{file_name_ts}"
-    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=workspace_directory)
+    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=temp_files_folder)
 
     # Remove Workspace Lock and Provide Download
     os.remove(workspace_directory + "/WORKSPACE_LOCKED")
@@ -202,20 +242,20 @@ async def export_fusion_json(fusion_apex_id):
     workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
 
     # Check Workspace Lock / Lock Workspace
-    if os.path.isfile(workspace_directory + "/WORKSPACE_LOCKED") == True:
-        return "Export Workspace Locked. Please run 1 export at a time."
-    else:
-        with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
-            lock_file.close()
+    if is_file_older_than(workspace_directory + "/WORKSPACE_LOCKED", datetime.timedelta(seconds=300)) == False or os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
+        return "Export Workspace Locked. Please run 1 export at a time.\nIf an error occurred and the lock is still in place. Wait 5 minutes and try again."
 
     # Cleaning Work Space
-    files = glob.glob('{}/*'.format(workspace_directory))
-    for f in files:
-        os.remove(f)
+    clean_workspace()
+
+    # Locking Workspace
+    with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
+        lock_file.close()
 
     # Creating JSON Folder
     temp_files_folder = os.path.join(workspace_directory, "temp_files")
-    os.mkdir(temp_files_folder)
+    if os.path.isdir(temp_files_folder) == False:
+        os.mkdir(temp_files_folder)
 
     # Setting up Neptune Fusion Class in Debug Mode
     neptune_fusion_direct = neptune_fusion.FUSION(fusion_apex_id, 31536000, fusion_debug=True)
@@ -238,7 +278,6 @@ async def export_fusion_json(fusion_apex_id):
     # Remove Workspace Lock and Provide Download
     os.remove(workspace_directory + "/WORKSPACE_LOCKED")
     return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
-
 
 @app.get("/", include_in_schema=False)
 async def documentation_home_page():

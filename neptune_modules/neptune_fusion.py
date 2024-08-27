@@ -96,9 +96,16 @@ class FUSION:
         self.driver.get(mlog_url)
         self.driver.implicitly_wait(3)
         self.driver.refresh()
+        self.driver.implicitly_wait(3)
         html_content = str(self.driver.page_source)
-        html_content = html_content[html_content.index("<pre>") + len("<pre>"):]
-        html_content = html_content[:html_content.index("</pre>") + len("</pre>")]
+        try:
+            html_content = html_content[html_content.index("<pre>") + len("<pre>"):]
+            html_content = html_content[:html_content.index("</pre>") + len("</pre>")]
+        except:
+            self.driver.refresh()
+            self.driver.implicitly_wait(3)
+            html_content = html_content[html_content.index("<pre>") + len("<pre>"):]
+            html_content = html_content[:html_content.index("</pre>") + len("</pre>")]
         html_content = html_content.replace("<pre>", "")
         html_content = html_content.replace("</pre>", "")
         html_to_json = json.loads(html_content)
