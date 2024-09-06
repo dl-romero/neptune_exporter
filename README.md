@@ -34,6 +34,9 @@ An all in one (Neptune Exporter, Prometheus and Grafana) installer is available 
       - selenium v4.23.1
       - uvicorn v0.30.6
 
+### Sample Grafana Dashboard
+![Sample Dashboard](https://repository-images.githubusercontent.com/847181458/376aab89-3493-4389-bcc4-e788094aaf67)
+
 ### Download and Installation Instructions
 The below instructions do not include the setup of the required fusion.yml and apex.yml files.<BR>
 See Fusion Configurations and Apex Configuration.
