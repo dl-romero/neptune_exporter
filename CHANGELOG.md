@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Debug / Feature Request Data Export. Exports JSON files needed to debug or build upon feature requests.
 
+## [0.0.2] - 2024-08-23
+
+### Added
+
+- Automated testing and release workflows.
+
 ## [0.0.1] - 2024-08-23
 
 ### Added
