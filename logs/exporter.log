@@ -1,0 +1,11 @@
+2026-04-17 20:14:13,074 ERROR Fusion metrics collection failed: Fusion response did not contain a JSON payload.
+Traceback (most recent call last):
+  File "/Users/dromero/Documents/GitHub/neptune_exporter/neptune_exporter.py", line 242, in fusion_prometheus_metrics
+    metrics = apex_fusion.prometheus_metrics()
+  File "/Users/dromero/Documents/GitHub/neptune_exporter/neptune_modules/neptune_fusion.py", line 204, in prometheus_metrics
+    fusion_status = self.get_status()
+  File "/Users/dromero/Documents/GitHub/neptune_exporter/neptune_modules/neptune_fusion.py", line 156, in get_status
+    systems = self.page_pre_to_json()
+  File "/Users/dromero/Documents/GitHub/neptune_exporter/neptune_modules/neptune_fusion.py", line 127, in page_pre_to_json
+    raise RuntimeError("Fusion response did not contain a JSON payload.")
+RuntimeError: Fusion response did not contain a JSON payload.

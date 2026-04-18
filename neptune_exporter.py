@@ -1,77 +1,110 @@
-"""
-Neptune Apex Exporter for Prometheus.
-"""
+"""Neptune Apex Exporter for Prometheus."""
+
+import datetime
 import json
-import socket
+import logging
 import os
-import glob
+import shutil
+from contextlib import contextmanager
+from ipaddress import ip_address
 from pathlib import Path
+from typing import Iterator
+
 import uvicorn
-from fastapi import FastAPI, Response, status, HTTPException
+import yaml
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from starlette.responses import FileResponse
-import yaml
+
 from neptune_modules import neptune_apex
 from neptune_modules import neptune_fusion
-import logging.config
-import shutil
-import datetime
 
-def setup_logger(name, log_file, level=logging.INFO):
-    """
-    Set up the logger for the application.
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG_DIR = BASE_DIR / "configuration"
+LOG_DIR = BASE_DIR / "logs"
+WORKSPACE_DIR = BASE_DIR / "workspace"
 
-    Args:
-        name (str): The name of the logger.
-        log_file (str): The path to the log file.
-        level (int): The logging level.
+LOG_DIR.mkdir(exist_ok=True)
+WORKSPACE_DIR.mkdir(exist_ok=True)
 
-    Returns:
-        logger (logging.Logger): The configured logger.
-    """
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+
+def setup_logger(name: str, log_file: Path, level: int = logging.INFO) -> logging.Logger:
+    """Set up the logger for the application."""
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger
+
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     handler = logging.FileHandler(log_file)
     handler.setFormatter(formatter)
-    logger = logging.getLogger(name)
     logger.setLevel(level)
+    logger.propagate = False
     logger.addHandler(handler)
     return logger
 
-application_logger = setup_logger('neptune_exporter', str(os.path.dirname(__file__)) + '/logs/' + 'exporter.log')
+
+application_logger = setup_logger("neptune_exporter", LOG_DIR / "exporter.log")
+
+
+def load_yaml_config(config_path: Path) -> dict:
+    """Load a YAML config file safely."""
+    try:
+        with config_path.open("r", encoding="utf-8") as config_file:
+            loaded_config = yaml.safe_load(config_file) or {}
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Configuration file not found: {config_path}") from exc
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"Invalid YAML in configuration file: {config_path}") from exc
+
+    if not isinstance(loaded_config, dict):
+        raise RuntimeError(f"Configuration must be a mapping: {config_path}")
+
+    return loaded_config
+
 
 try:
-    loaded_cfg_file = str(os.path.dirname(__file__)) + "/configuration/" + "exporter.yml"
-    config_file = open(loaded_cfg_file, 'r')
-    configuration = yaml.load(config_file, Loader=yaml.Loader)
-except:
-    application_logger.error('Configuration File Load Failed')
-    exit()
+    configuration = load_yaml_config(CONFIG_DIR / "exporter.yml")
+except RuntimeError as exc:
+    application_logger.exception("Configuration File Load Failed: %s", exc)
+    raise SystemExit(1) from exc
+
+exporter_info = configuration.get("neptune_exporter", {})
 
 app = FastAPI(
-    title="Neptune Exporter",
-    summary="Prometheus Exporter for the Neptune Apex.",
-    description="https://github.com/dl-romero/apex_exporter",
-    version="1.0",
-    contact={
-        "name": "dromero.dev",
-        "url": "https://dromero.dev"
-    },
-    license_info={
-        "name": "License",
-        "url": "https://github.com/dl-romero/apex_exporter/blob/main/LICENSE",
-    },
+    title=exporter_info.get("title", "Neptune Exporter"),
+    summary=exporter_info.get("summary", "Prometheus Exporter for the Neptune Apex."),
+    description=exporter_info.get("description", "https://github.com/dl-romero/neptune_exporter"),
+    version=str(exporter_info.get("version", "1.0")),
+    contact=exporter_info.get(
+        "contact",
+        {
+            "name": "dromero.dev",
+            "url": "https://dromero.dev",
+        },
+    ),
+    license_info=exporter_info.get(
+        "license_info",
+        {
+            "name": "License",
+            "url": "https://github.com/dl-romero/neptune_exporter/blob/main/LICENSE",
+        },
+    ),
     openapi_tags=[
         {
+            "name": "Health",
+            "description": "Service health endpoints.",
+        },
+        {
             "name": "Apex",
-            "description": "Get Apex Metrics in Prometheus Format",
+            "description": "Get Apex metrics in Prometheus format.",
         },
         {
             "name": "Fusion",
-            "description": "Get Fusion Metrics in Prometheus Format",
+            "description": "Get Fusion metrics in Prometheus format.",
         },
         {
             "name": "Export Logs",
-            "description": "Download Neptune Exporter Log data.",
+            "description": "Download Neptune Exporter log data.",
         },
         {
             "name": "Export Apex JSON Files",
@@ -80,250 +113,238 @@ app = FastAPI(
         {
             "name": "Export Fusion JSON Files",
             "description": "Download Fusion JSON data.",
-        }
-    ]
+        },
+    ],
 )
 
-def clean_workspace():
-    """
-    Cleans the workspace directory by removing all files and directories within it.
-    Returns:
-        bool: True if the workspace is successfully cleaned, False if the workspace is locked.
-    """
 
-    # Defining Work Space
-    workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
-
-    # Check Workspace Lock / Lock Workspace
-    if os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
-        return False
-
-    # Cleaning Work Space
-    files = glob.glob('{}/*'.format(workspace_directory))
-    for f in files:
-        if os.path.isfile(f):
-            os.remove(f)
-        if os.path.isdir(f):
-            try:
-                os.rmdir(f)
-            except:
-                shutil.rmtree(f)
+def clean_workspace() -> bool:
+    """Remove all generated workspace content while preserving the lock file."""
+    WORKSPACE_DIR.mkdir(exist_ok=True)
+    for item in WORKSPACE_DIR.iterdir():
+        if item.name == "WORKSPACE_LOCKED":
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
     return True
 
-def is_file_older_than(file, delta): 
-    """
-    Checks if a file is older than a specified time delta.
-    Args:
-        file (str): The path to the file.
-        delta (datetime.timedelta): The time delta to compare against.
-    Returns:
-        bool: True if the file is older than the specified time delta, False otherwise.
-    """
 
-    cutoff = datetime.datetime.utcnow() - delta
-    mtime = datetime.datetime.utcfromtimestamp(os.path.getmtime(file))
-    if mtime < cutoff:
+def is_file_older_than(file_path: Path | str, delta: datetime.timedelta) -> bool:
+    """Check whether a file is older than a specified time delta."""
+    checked_file = Path(file_path)
+    if not checked_file.exists():
         return True
-    return False
+
+    cutoff = datetime.datetime.now(datetime.UTC) - delta
+    mtime = datetime.datetime.fromtimestamp(checked_file.stat().st_mtime, tz=datetime.UTC)
+    return mtime < cutoff
+
+
+@contextmanager
+def workspace_lock() -> Iterator[Path]:
+    """Lock the export workspace for a single export job."""
+    WORKSPACE_DIR.mkdir(exist_ok=True)
+    lock_path = WORKSPACE_DIR / "WORKSPACE_LOCKED"
+
+    if lock_path.exists() and is_file_older_than(lock_path, datetime.timedelta(minutes=5)):
+        lock_path.unlink(missing_ok=True)
+
+    try:
+        with lock_path.open("x", encoding="utf-8") as lock_file:
+            lock_file.write(datetime.datetime.now(datetime.UTC).isoformat())
+    except FileExistsError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Export workspace is locked. Please wait a few minutes and try again.",
+        ) from exc
+
+    try:
+        clean_workspace()
+        yield WORKSPACE_DIR
+    finally:
+        if lock_path.exists():
+            lock_path.unlink()
+
+
+def validate_target(target: str) -> str:
+    """Validate the target IP address for local Apex scraping."""
+    try:
+        return str(ip_address(target))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid target IP address.") from exc
+
+
+def validate_auth_module(auth_module: str) -> str:
+    """Validate the configured local Apex auth module."""
+    configured_auths = neptune_apex.configuration.get("apex_auths", {})
+    if auth_module not in configured_auths:
+        raise HTTPException(status_code=400, detail="Invalid auth_module.")
+    return auth_module
+
+
+def validate_fusion_apex_id(fusion_apex_id: str) -> str:
+    """Validate the configured Fusion system id."""
+    configured_systems = neptune_fusion.configuration.get("fusion", {}).get("apex_systems", {})
+    if fusion_apex_id not in configured_systems:
+        raise HTTPException(status_code=400, detail="Invalid fusion_apex_id.")
+    return fusion_apex_id
+
+
+def write_json_file(output_path: Path, payload: object) -> None:
+    """Write JSON data to disk with deterministic formatting."""
+    with output_path.open("w", encoding="utf-8") as data_file:
+        json.dump(payload, data_file, indent=4, sort_keys=True)
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Liveness endpoint for service and container health checks."""
+    return {
+        "status": "ok",
+        "service": "neptune_exporter",
+        "time_utc": datetime.datetime.now(datetime.UTC).isoformat(),
+    }
+
 
 @app.get("/metrics/apex", response_class=PlainTextResponse, tags=["Apex"])
-async def apex_prometheus_metrics(target, auth_module):
-    """
-    Get Apex metrics in Prometheus format.
+async def apex_prometheus_metrics(
+    target: str = Query(..., description="The IP address of the Apex device."),
+    auth_module: str = Query(..., min_length=1, max_length=100),
+):
+    """Get Apex metrics in Prometheus format."""
+    validated_target = validate_target(target)
+    validated_auth_module = validate_auth_module(auth_module)
 
-    Args:
-        target (str): The IP address of the Apex device.
-        auth_module (str): The authentication module.
+    try:
+        apex_direct = neptune_apex.APEX(apex_ip=validated_target, auth_module=validated_auth_module)
+        metrics = apex_direct.prometheus_metrics()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        application_logger.exception("Apex metrics collection failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Failed to collect Apex metrics.") from exc
 
-    Returns:
-        str: The Prometheus metrics.
-    """
-    apex_direct = neptune_apex.APEX(apex_ip=target, auth_module=auth_module)
-    return apex_direct.prometheus_metrics()
+    return metrics
+
 
 @app.get("/metrics/fusion", response_class=PlainTextResponse, tags=["Fusion"])
-async def fusion_prometheus_metrics(data_max_age, fusion_apex_id):
-    """
-    Get Fusion metrics in Prometheus format.
+async def fusion_prometheus_metrics(
+    data_max_age: int = Query(..., ge=60, le=86400),
+    fusion_apex_id: str = Query(..., min_length=1, max_length=128),
+):
+    """Get Fusion metrics in Prometheus format."""
+    validated_fusion_apex_id = validate_fusion_apex_id(fusion_apex_id)
 
-    Args:
-        data_max_age (int): The maximum age of the data.
-        fusion_apex_id (str): The ID of the Fusion Apex.
+    try:
+        with neptune_fusion.FUSION(validated_fusion_apex_id, data_max_age) as apex_fusion:
+            metrics = apex_fusion.prometheus_metrics()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        application_logger.exception("Fusion metrics collection failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Failed to collect Fusion metrics.") from exc
 
-    Returns:
-        str: The Prometheus metrics.
-    """
-    apex_fusion = neptune_fusion.FUSION(fusion_apex_id, data_max_age)
-    return apex_fusion.prometheus_metrics()
+    return metrics
 
-@app.get("/export/logs/", response_class=PlainTextResponse, tags=["Export Log Data"])
+
+@app.get("/export/logs/", tags=["Export Log Data"])
 async def apex_exporter_logs():
-    """
-    Export and download logs.
+    """Export and download application logs."""
+    archive_path = None
 
-    This function creates a zip archive of the logs directory and returns it as a FileResponse object.
+    with workspace_lock() as workspace_directory:
+        file_name_ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        archive_base = workspace_directory / f"neptune_exporter-logs.{file_name_ts}"
+        shutil.make_archive(str(archive_base), format="zip", root_dir=LOG_DIR)
+        archive_path = Path(f"{archive_base}.zip")
 
-    Returns:
-        FileResponse: The zip archive containing the logs.
-    """
-    log_directory = os.path.join(os.path.dirname(__file__), 'logs')
-    workspace_directory = os.path.join(os.path.dirname(__file__), 'workspace')
-    
-    # Check Workspace Lock / Lock Workspace
-    if is_file_older_than(workspace_directory + "/WORKSPACE_LOCKED", datetime.timedelta(seconds=300)) == False or os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
-        return "Export Workspace Locked. Please run 1 export at a time.\nIf an error occurred and the lock is still in place. Wait 5 minutes and try again."
-    
-    # Cleaning Work Space
-    clean_workspace()
+    return FileResponse(
+        path=str(archive_path),
+        media_type="application/octet-stream",
+        filename=archive_path.name,
+    )
 
-    # Locking Workspace
-    with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
-        lock_file.close()
 
-    # Compress files in workspace/temp_files. Zip is located in workspace
-    file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_name = f"neptune_exporter-logs.{file_name_ts}"
-    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=log_directory)
+@app.get("/export/apex/", tags=["Export Apex JSON Files"])
+async def export_apex_json(
+    target: str = Query(..., description="The IP address of the Apex device."),
+    auth_module: str = Query(..., min_length=1, max_length=100),
+):
+    """Export Apex JSON data from a Neptune Apex device."""
+    validated_target = validate_target(target)
+    validated_auth_module = validate_auth_module(auth_module)
 
-    # Remove Workspace Lock and Provide Download
-    os.remove(workspace_directory + "/WORKSPACE_LOCKED")
-    return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
+    with workspace_lock() as workspace_directory:
+        temp_files_folder = workspace_directory / "temp_files"
+        temp_files_folder.mkdir(exist_ok=True)
 
-@app.get("/export/apex/", response_class=PlainTextResponse, tags=["Export Apex JSON Files"])
-async def export_apex_json(target, auth_module):
-    """
-    Export Apex JSON data from Neptune Apex device.
-    Args:
-        target (str): The IP address of the Neptune Apex device.
-        auth_module (str): The authentication module to be used.
-    Returns:
-        FileResponse: The response containing the exported JSON data in a zip file.
-    Raises:
-        FileNotFoundError: If the workspace directory or any required files are not found.
-        Exception: If the workspace is locked or an error occurs during the export process.
-    """
+        apex_direct = neptune_apex.APEX(
+            apex_ip=validated_target,
+            auth_module=validated_auth_module,
+            apex_debug=True,
+        )
 
-    # Defining Work Space
-    workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
+        payloads = {
+            "status.json": apex_direct.status(),
+            "ilog.json": apex_direct.internal_log(),
+            "dlog.json": apex_direct.dos_log(),
+            "tlog.json": apex_direct.trident_log(),
+            "config.json": apex_direct.config(),
+        }
+        for file_name, payload in payloads.items():
+            write_json_file(temp_files_folder / file_name, payload)
 
-    # Check Workspace Lock / Lock Workspace
-    if is_file_older_than(workspace_directory + "/WORKSPACE_LOCKED", datetime.timedelta(seconds=300)) == False or os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
-        return "Export Workspace Locked. Please run 1 export at a time.\nIf an error occurred and the lock is still in place. Wait 5 minutes and try again."
+        file_name_ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        archive_base = workspace_directory / f"neptune_apex-json.{file_name_ts}"
+        shutil.make_archive(str(archive_base), format="zip", root_dir=temp_files_folder)
+        archive_path = Path(f"{archive_base}.zip")
 
-    # Cleaning Work Space
-    clean_workspace()
+    return FileResponse(
+        path=str(archive_path),
+        media_type="application/octet-stream",
+        filename=archive_path.name,
+    )
 
-    # Locking Workspace
-    with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
-        lock_file.close()
 
-    # Creating JSON Folder
-    temp_files_folder = os.path.join(workspace_directory, "temp_files")
-    if os.path.isdir(temp_files_folder) == False:
-        os.mkdir(temp_files_folder)
+@app.get("/export/fusion/", tags=["Export Fusion JSON Files"])
+async def export_fusion_json(
+    fusion_apex_id: str = Query(..., min_length=1, max_length=128),
+):
+    """Export Fusion JSON data."""
+    validated_fusion_apex_id = validate_fusion_apex_id(fusion_apex_id)
 
-    # Setting up Neptune Apex Class in Debug Mode
-    apex_direct = neptune_apex.APEX(apex_ip=target, auth_module=auth_module, apex_debug = True)
-    
-    # Status JSON
-    with open(os.path.join(temp_files_folder, "status.json"), "w") as data_file:
-        json.dump(apex_direct.status(), data_file, indent=4, sort_keys=True)
-        data_file.close()
-    
-    # ILOG JSON
-    with open(os.path.join(temp_files_folder, "ilog.json"), "w") as data_file:
-        json.dump(apex_direct.internal_log(), data_file, indent=4, sort_keys=True)
-        data_file.close()
+    with workspace_lock() as workspace_directory:
+        temp_files_folder = workspace_directory / "temp_files"
+        temp_files_folder.mkdir(exist_ok=True)
 
-    # DOS JSON
-    with open(os.path.join(temp_files_folder, "dlog.json"), "w") as data_file:
-        json.dump(apex_direct.dos_log(), data_file, indent=4, sort_keys=True)
-        data_file.close()
+        with neptune_fusion.FUSION(validated_fusion_apex_id, 31536000, fusion_debug=True) as fusion_client:
+            write_json_file(temp_files_folder / "mlog.json", fusion_client.get_measurement_log())
+            write_json_file(temp_files_folder / "status.json", fusion_client.get_status())
 
-    # Trident JSON
-    with open(os.path.join(temp_files_folder, "tlog.json"), "w") as data_file:
-        json.dump(apex_direct.trident_log(), data_file, indent=4, sort_keys=True)
-        data_file.close()
+        file_name_ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        archive_base = workspace_directory / f"neptune_fusion-json.{file_name_ts}"
+        shutil.make_archive(str(archive_base), format="zip", root_dir=temp_files_folder)
+        archive_path = Path(f"{archive_base}.zip")
 
-    # Config JSON
-    with open(os.path.join(temp_files_folder, "config.json"), "w") as data_file:
-        json.dump(apex_direct.trident_log(), data_file, indent=4, sort_keys=True)
-        data_file.close()
+    return FileResponse(
+        path=str(archive_path),
+        media_type="application/octet-stream",
+        filename=archive_path.name,
+    )
 
-    # Compress files in workspace/temp_files. Zip is located in workspace
-    file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_name = f"neptune_apex-json.{file_name_ts}"
-    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=temp_files_folder)
-
-    # Remove Workspace Lock and Provide Download
-    os.remove(workspace_directory + "/WORKSPACE_LOCKED")
-    return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
-
-@app.get("/export/fusion/", response_class=PlainTextResponse, tags=["Export Fusion JSON Files"])
-async def export_fusion_json(fusion_apex_id):
-    """
-    Export Fusion JSON data.
-    Args:
-        fusion_apex_id (str): The ID of the Fusion Apex.
-    Returns:
-        FileResponse: The response containing the exported JSON data in a zip file.
-    Raises:
-        FileNotFoundError: If the workspace directory or any required files are not found.
-        Exception: If the workspace is locked or an error occurs during the export process.
-    """
-
-    # Defining Work Space
-    workspace_directory = os.path.join(os.path.dirname(__file__), "workspace")
-
-    # Check Workspace Lock / Lock Workspace
-    if is_file_older_than(workspace_directory + "/WORKSPACE_LOCKED", datetime.timedelta(seconds=300)) == False or os.path.isfile(workspace_directory + "WORKSPACE_LOCKED") == True:
-        return "Export Workspace Locked. Please run 1 export at a time.\nIf an error occurred and the lock is still in place. Wait 5 minutes and try again."
-
-    # Cleaning Work Space
-    clean_workspace()
-
-    # Locking Workspace
-    with open(os.path.join(workspace_directory, "WORKSPACE_LOCKED"), "w") as lock_file:
-        lock_file.close()
-
-    # Creating JSON Folder
-    temp_files_folder = os.path.join(workspace_directory, "temp_files")
-    if os.path.isdir(temp_files_folder) == False:
-        os.mkdir(temp_files_folder)
-
-    # Setting up Neptune Fusion Class in Debug Mode
-    neptune_fusion_direct = neptune_fusion.FUSION(fusion_apex_id, 31536000, fusion_debug=True)
-
-    # Measurement Log JSON
-    with open(os.path.join(temp_files_folder, "mlog.json"), "w") as data_file:
-        json.dump(neptune_fusion_direct.get_measurement_log(), data_file, indent=4, sort_keys=True)
-        data_file.close()
-
-    # Status JSON
-    with open(os.path.join(temp_files_folder, "status.json"), "w") as data_file:
-        json.dump(neptune_fusion_direct.get_status(), data_file, indent=4, sort_keys=True)
-        data_file.close()
-
-    # Compress files in workspace/temp_files. Zip is located in workspace
-    file_name_ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_name = f"neptune_fusion-json.{file_name_ts}"
-    shutil.make_archive(os.path.join(workspace_directory, file_name), format='zip', root_dir=workspace_directory)
-
-    # Remove Workspace Lock and Provide Download
-    os.remove(workspace_directory + "/WORKSPACE_LOCKED")
-    return FileResponse(os.path.join(workspace_directory, f"{file_name}.zip"), media_type='application/octet-stream', filename=f"{file_name}.zip")
 
 @app.get("/", include_in_schema=False)
 async def documentation_home_page():
-    """
-    Redirect to the documentation home page.
+    """Redirect to the documentation home page."""
+    return RedirectResponse(url="/docs")
 
-    Returns:
-        RedirectResponse: The redirect response.
-    """
-    return RedirectResponse(url='/docs')
 
 if __name__ == "__main__":
-    server_hostname = socket.gethostname()
-    app_name = Path(__file__).stem
-    uvicorn.run("{}:app".format(app_name), host=server_hostname, port=5006, log_level="info")
+    uvicorn.run(
+        "neptune_exporter:app",
+        host=os.getenv("NEPTUNE_EXPORTER_HOST", "0.0.0.0"),
+        port=int(os.getenv("NEPTUNE_EXPORTER_PORT", "5006")),
+        log_level=os.getenv("NEPTUNE_EXPORTER_LOG_LEVEL", "info"),
+    )

@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+logs/
+workspace/
+configuration/*_example.yml

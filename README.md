@@ -1,145 +1,372 @@
 # Neptune Exporter
-A Prometheus Exporter for the Neptune Apex and Neptune Fusion.<br>
-[Neptune Systems](https://www.neptunesystems.com/) provides monitoring and automation solutions to the Marine Aquarists Community.<br>
 
-Notice: 
-  - This software is not maintaintained by Neptune Systems.
-  - The software and its creator(s) are not endorsed or affiliated with Neptune Systems in anyway shape or form.
+Neptune Exporter is a Prometheus exporter for Neptune Apex and Neptune Fusion.
 
-The purpose of this exporter is to:
- - Enable Neptune users with the capability of creating alternative dashboards and alerting.
- - Provide the ability to retain data long term.
- - Provide Multi-Apex-Unit users the ability to compare data between Apex Units.
- - Enable the capability to create multi-vendor dashbaords.
+[Neptune Systems](https://www.neptunesystems.com/) provides monitoring and automation solutions to the marine aquarium community.
 
-### Documentation
+## Notice
 
-Neptune Exporter uses port 5006 as documented on [Prometheus: Default Port Allocations](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).<BR>
-<BR>
-Please submit bug reports and feature requests [HERE](https://github.com/dl-romero/neptune_exporter/issues/new/choose) or by clicking the Issues tab in this repository.
+- This software is not maintained by Neptune Systems.
+- The software and its creator are not endorsed by or affiliated with Neptune Systems.
 
-This repository contains only the Neptune Exporter.<BR>
-An all in one (Neptune Exporter, Prometheus and Grafana) installer is available at [Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer).
+## What this project does
 
-### Requirements
- - Linux OS.
-    - Confirmed working OS:
-      - Rocky 9
-      - CentOS 7
- - Python 3.9.X
-    - Python Packages:
-      - fastapi v0.112.1
-      - PyYAML v6.0.2
-      - Requests v2.32.3
-      - selenium v4.23.1
-      - uvicorn v0.30.6
+This exporter makes it possible to:
 
-### Sample Grafana Dashboard
+- scrape local Neptune Apex metrics
+- scrape Neptune Fusion metrics
+- retain long-term telemetry in Prometheus
+- build custom dashboards and alerts in Grafana
+- compare multiple Apex systems in one monitoring stack
+
+Neptune Exporter listens on port 5006.
+
+## Features
+
+- FastAPI-based HTTP service
+- Prometheus endpoints for Apex and Fusion
+- export endpoints for logs and JSON diagnostics
+- container-friendly health endpoint at /health
+- interactive API docs at /docs
+
+## Requirements
+
+### General
+
+- Linux host or a Docker-capable Linux system
+- network access to your local Apex controller for Apex scraping
+- internet access to apexfusion.com for Fusion scraping
+
+### Native Linux install
+
+- Python 3.10 or later
+- Chromium or Chrome plus a compatible ChromeDriver in PATH for Fusion scraping
+
+### Docker install
+
+The included image installs Chromium and ChromeDriver automatically.
+
+## Sample Grafana dashboard
+
 ![Sample Dashboard](https://repository-images.githubusercontent.com/847181458/376aab89-3493-4389-bcc4-e788094aaf67)
 
-### Download and Installation Instructions
-The below instructions do not include the setup of the required fusion.yml and apex.yml files.<BR>
-See Fusion Configurations and Apex Configuration.
+---
+
+## Linux installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/dl-romero/neptune_exporter.git
+cd neptune_exporter
 ```
-wget https://github.com/dl-romero/neptune_exporter/archive/refs/heads/main.zip
-cd neptune_exporter-main
-pip3 install -r requirements.txt
-sudo mkdir /etc/neptune_exporter
-sudo cp -R * /etc/neptune_exporter
-sudo cp neptune_exporter.service /etc/systemd/system
-# In the command below. Replace <USERNAME>,<USERGROUP> with your actual username and group.
-sudo chown <USERNAME>:<USERGROUP> -R /etc/neptune_exporter 
-sudo vi /etc/systemd/system/neptune_exporter.service 
-# Replace <USERNAME> with your actual username.
-# Press Esc key.
-# Enter a colon ":" without the quotes.
-# Enter "wq!" without the quotes.
-# Press Enter key.
+
+### 2. Create a Python virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 3. Install browser dependencies for Fusion scraping
+
+Example for Debian or Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y chromium chromium-driver
+```
+
+Example for Rocky, RHEL, or CentOS:
+
+```bash
+sudo dnf install -y chromium chromedriver
+```
+
+Package names may vary slightly by distribution.
+
+### 4. Create runtime directories
+
+```bash
+mkdir -p logs workspace
+```
+
+### 5. Configure the exporter
+
+#### Apex configuration
+
+Edit configuration/apex.yml:
+
+```yaml
+apex_auths:
+  default:
+    username: admin
+    password: your_local_apex_password
+```
+
+You can define more than one auth profile if you scrape multiple local Apex systems that use different credentials.
+
+#### Fusion configuration
+
+Edit configuration/fusion.yml:
+
+```yaml
+fusion:
+  apex_systems:
+    YOUR_FUSION_APEX_ID:
+      username: your_fusion_username
+      password: your_fusion_password
+```
+
+The Fusion Apex ID is the long device identifier shown in the Fusion URL.
+
+#### Optional metadata configuration
+
+You can also customize the API metadata in configuration/exporter.yml.
+
+### 6. Start the exporter manually
+
+```bash
+source .venv/bin/activate
+python -m uvicorn neptune_exporter:app --host 0.0.0.0 --port 5006
+```
+
+### 7. Verify the service
+
+Open these URLs from your browser or test them with curl:
+
+```bash
+curl http://127.0.0.1:5006/health
+curl http://127.0.0.1:5006/docs
+```
+
+Example direct Apex scrape test:
+
+```bash
+curl "http://127.0.0.1:5006/metrics/apex?target=192.168.1.50&auth_module=default"
+```
+
+Example direct Fusion scrape test:
+
+```bash
+curl "http://127.0.0.1:5006/metrics/fusion?fusion_apex_id=YOUR_FUSION_APEX_ID&data_max_age=300"
+```
+
+---
+
+## Linux systemd service setup
+
+If you want the exporter to start automatically on boot:
+
+### 1. Copy the application to a permanent location
+
+```bash
+sudo mkdir -p /etc/neptune_exporter
+sudo cp -R . /etc/neptune_exporter
+sudo chown -R YOUR_USERNAME:YOUR_GROUP /etc/neptune_exporter
+```
+
+### 2. Install the service file
+
+```bash
+sudo cp neptune_exporter.service /etc/systemd/system/neptune_exporter.service
+sudo nano /etc/systemd/system/neptune_exporter.service
+```
+
+Replace the User value with your Linux username.
+
+### 3. Enable and start the service
+
+```bash
 sudo systemctl daemon-reload
-sudo systemctl start neptune_exporter
 sudo systemctl enable neptune_exporter
+sudo systemctl start neptune_exporter
 sudo systemctl status neptune_exporter
 ```
 
-### Fusion Configuration
-File Location: configuration/fusion.yml<BR>
-Example:
+### 4. Review logs if needed
+
+```bash
+journalctl -u neptune_exporter -f
 ```
-fusion:
-  apex_systems:
-    234j5nliu2345oin2345in2345: # <- Apex ID from URL.
-      username: reef_master # <- Fusion Login Username
-      password: i-glue-animals-to-rocks #<- Fusion Login Password 
-```
-After updating this file the service should be restarted
-```
+
+After changing configuration/apex.yml or configuration/fusion.yml, restart the service:
+
+```bash
 sudo systemctl restart neptune_exporter
 ```
 
-### Apex Configuration
-File Location: configuration/apex.yml<BR>
-Example:
-```
-apex_auths:
-  'default':
-    username: 'admin'
-    password: '1234'
-  'new_auth_name': # <- Call this whatever you want just no duplicates. prometheus.yml will this.
-    username: 'admin' # <- Apex (local) Login Username
-    password: 'i-glue-animals-to-rocks' #<- Apex (local) Login Password 
-```
-After updating this file the service should be restarted
-```
-sudo systemctl restart neptune_exporter
+---
+
+## Docker usage
+
+The included Docker image is the simplest way to run the exporter in a self-contained environment.
+
+### 1. Build the image
+
+From the repository root:
+
+```bash
+docker build -t neptune-exporter .
 ```
 
-### Prometheus Configuration
-File Location: etc/promethues/prometheus.yml<BR>
-This should be added to your "scrape_configs":
-Example:
+### 2. Prepare host directories
+
+```bash
+mkdir -p logs workspace
 ```
-scrape_configs:
+
+Edit the config files in the local configuration directory before starting the container.
+
+### 3. Run the container
+
+```bash
+docker run -d \
+  --name neptune-exporter \
+  --restart unless-stopped \
+  --shm-size=1g \
+  -p 5006:5006 \
+  -v "$(pwd)/configuration:/app/configuration" \
+  -v "$(pwd)/logs:/app/logs" \
+  -v "$(pwd)/workspace:/app/workspace" \
+  neptune-exporter
+```
+
+The shared memory setting helps headless Chromium run more reliably for Fusion scraping.
+
+### 4. Verify the container
+
+```bash
+docker ps
+docker logs neptune-exporter
+curl http://127.0.0.1:5006/health
+```
+
+### Optional docker compose example
+
+```yaml
+services:
+  neptune-exporter:
+    build: .
+    container_name: neptune-exporter
+    restart: unless-stopped
+    shm_size: 1gb
+    ports:
+      - "5006:5006"
+    volumes:
+      - ./configuration:/app/configuration
+      - ./logs:/app/logs
+      - ./workspace:/app/workspace
+```
+
+Start it with:
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+## Prometheus configuration
+
+Add the exporter to your Prometheus scrape_configs.
+
+### Apex scrape job
+
+```yaml
 - job_name: neptune_apex
   static_configs:
-  - targets: 
-    - 192.168.1.50 # <- Apex System 1
-    - 192.168.1.13 # <- Apex System 2
-    - 192.168.1.8 # <- Apex System 3
+    - targets:
+        - 192.168.1.50
+        - 192.168.1.13
   metrics_path: /metrics/apex
   params:
     auth_module:
-    - default # <- This is the name of the apex_auth you added in the apex.yml file.
+      - default
   relabel_configs:
-  - source_labels:
-    - __address__
-    target_label: __param_target
-  - source_labels:
-    - __param_target
-    target_label: instance
-  - target_label: __address__
-    replacement: <YOUR NEPTUNE EXPORTERS HOSTNAME HERE>:5006 # <- Replace with your hostname where the Neptune Exporter is hosted.
-    
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      replacement: YOUR_EXPORTER_HOST:5006
+```
+
+### Fusion scrape job
+
+```yaml
 - job_name: neptune_fusion
   static_configs:
-  - targets: 
-     - 234j5nliu2345oin2345in2345 # <- These are the Apex IDs you added in the fusion.yml file.
-     - j24j5nliasdfasdfaa45fdsdf1 # <- These are the Apex IDs you added in the fusion.yml file.
+    - targets:
+        - YOUR_FUSION_APEX_ID
   metrics_path: /metrics/fusion
   params:
     data_max_age:
-    - 300 # <- This should be the same as your scrape_interval set at the top of this file.
+      - 300
   relabel_configs:
-  - source_labels:
-    - __param_target
-    target_label: instance
-  - source_labels:
-    - __address__
-    target_label: __param_fusion_apex_id
-  - target_label: __address__
-    replacement: <YOUR NEPTUNE EXPORTERS HOSTNAME HERE>:5006 # <- Replace with your hostname where the Neptune Exporter is hosted.
+    - source_labels: [__param_target]
+      target_label: instance
+    - source_labels: [__address__]
+      target_label: __param_fusion_apex_id
+    - target_label: __address__
+      replacement: YOUR_EXPORTER_HOST:5006
 ```
-After updating this file the service should be restarted
-```
+
+After updating Prometheus, restart it:
+
+```bash
 sudo systemctl restart prometheus
 ```
-<BR>
+
+---
+
+## Available endpoints
+
+- /health
+- /docs
+- /metrics/apex
+- /metrics/fusion
+- /export/logs/
+- /export/apex/
+- /export/fusion/
+
+---
+
+## Troubleshooting
+
+### Apex scrape returns 400
+
+- confirm the target IP is valid
+- confirm the auth_module exists in configuration/apex.yml
+
+### Fusion scrape returns 502
+
+- verify the Fusion username and password
+- confirm the Fusion Apex ID is correct
+- make sure Chromium and ChromeDriver are installed on native Linux installs
+- if running in Docker, review container logs with docker logs neptune-exporter
+
+### Export endpoints say the workspace is locked
+
+Wait a few minutes and retry. The exporter prevents overlapping debug exports.
+
+### Service is running but Prometheus cannot scrape it
+
+- verify port 5006 is open on the host
+- confirm Prometheus can reach the exporter host over the network
+- test locally with curl against /health and /metrics/apex
+
+---
+
+## Support
+
+Please submit bug reports and feature requests here:
+
+[Neptune Exporter Issues](https://github.com/dl-romero/neptune_exporter/issues/new/choose)
+
+An all-in-one installer that combines Neptune Exporter, Prometheus, and Grafana is also available here:
+
+[Neptune Exporter AIO Installer](https://github.com/dl-romero/neptune_exporter_aio_installer)
+

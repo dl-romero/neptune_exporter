@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+workspace/
+logs/*.log
+configuration/apex.yml
+configuration/fusion.yml
