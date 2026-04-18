@@ -19,6 +19,8 @@ from starlette.responses import FileResponse
 from neptune_modules import neptune_apex
 from neptune_modules import neptune_fusion
 
+UTC = datetime.timezone.utc
+
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = BASE_DIR / "configuration"
 LOG_DIR = BASE_DIR / "logs"
@@ -137,8 +139,8 @@ def is_file_older_than(file_path: Path | str, delta: datetime.timedelta) -> bool
     if not checked_file.exists():
         return True
 
-    cutoff = datetime.datetime.now(datetime.UTC) - delta
-    mtime = datetime.datetime.fromtimestamp(checked_file.stat().st_mtime, tz=datetime.UTC)
+    cutoff = datetime.datetime.now(UTC) - delta
+    mtime = datetime.datetime.fromtimestamp(checked_file.stat().st_mtime, tz=UTC)
     return mtime < cutoff
 
 
@@ -153,7 +155,7 @@ def workspace_lock() -> Iterator[Path]:
 
     try:
         with lock_path.open("x", encoding="utf-8") as lock_file:
-            lock_file.write(datetime.datetime.now(datetime.UTC).isoformat())
+            lock_file.write(datetime.datetime.now(UTC).isoformat())
     except FileExistsError as exc:
         raise HTTPException(
             status_code=409,
@@ -204,7 +206,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "neptune_exporter",
-        "time_utc": datetime.datetime.now(datetime.UTC).isoformat(),
+        "time_utc": datetime.datetime.now(UTC).isoformat(),
     }
 
 
@@ -255,7 +257,7 @@ async def apex_exporter_logs():
     archive_path = None
 
     with workspace_lock() as workspace_directory:
-        file_name_ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        file_name_ts = datetime.datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         archive_base = workspace_directory / f"neptune_exporter-logs.{file_name_ts}"
         shutil.make_archive(str(archive_base), format="zip", root_dir=LOG_DIR)
         archive_path = Path(f"{archive_base}.zip")
@@ -296,7 +298,7 @@ async def export_apex_json(
         for file_name, payload in payloads.items():
             write_json_file(temp_files_folder / file_name, payload)
 
-        file_name_ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        file_name_ts = datetime.datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         archive_base = workspace_directory / f"neptune_apex-json.{file_name_ts}"
         shutil.make_archive(str(archive_base), format="zip", root_dir=temp_files_folder)
         archive_path = Path(f"{archive_base}.zip")
@@ -323,7 +325,7 @@ async def export_fusion_json(
             write_json_file(temp_files_folder / "mlog.json", fusion_client.get_measurement_log())
             write_json_file(temp_files_folder / "status.json", fusion_client.get_status())
 
-        file_name_ts = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        file_name_ts = datetime.datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         archive_base = workspace_directory / f"neptune_fusion-json.{file_name_ts}"
         shutil.make_archive(str(archive_base), format="zip", root_dir=temp_files_folder)
         archive_path = Path(f"{archive_base}.zip")

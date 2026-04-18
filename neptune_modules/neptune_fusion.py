@@ -13,6 +13,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
+UTC = datetime.timezone.utc
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "logs"
 CONFIG_PATH = BASE_DIR / "configuration" / "fusion.yml"
@@ -311,12 +313,12 @@ class FUSION:
             log_timestamp_utc = datetime.datetime.strptime(
                 f"{log_date}+0000", "%Y-%m-%dT%H:%M:%S.%fZ%z"
             )
-            current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+            current_timestamp_delta_utc = datetime.datetime.now(UTC) - datetime.timedelta(
                 seconds=self.max_data_age
             )
         except ValueError:
             log_timestamp_utc = datetime.datetime.strptime(str(log_date), "%Y-%m-%dT%H:%M:%S.%fZ")
-            current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC).replace(
+            current_timestamp_delta_utc = datetime.datetime.now(UTC).replace(
                 tzinfo=None
             ) - datetime.timedelta(seconds=self.max_data_age)
 
