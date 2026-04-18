@@ -198,30 +198,23 @@ class FUSION:
             return "magnesium"
         return sensor_type
 
-    def prometheus_metrics(self):
-        """Generate Prometheus metrics for Fusion."""
-        metric_lines = []
-        fusion_status = self.get_status()
-        apex_id = fusion_status["_id"]
-        apex_type = fusion_status["type"]
-        apex_serial = fusion_status["serial"]
-        apex_hardware = fusion_status["hardware"]
-        apex_hostname = fusion_status["hostname"]
-        apex_software = fusion_status["software"]
-
-        base_label_values = [
-            f'apex_id="{apex_id}"',
-            f'apex_serial="{apex_serial}"',
-            f'apex_hostname="{apex_hostname}"',
+    def base_label_values(self, fusion_status):
+        """Build the common label set for all Fusion metrics."""
+        return [
+            f'apex_id="{fusion_status["_id"]}"',
+            f'apex_serial="{fusion_status["serial"]}"',
+            f'apex_hostname="{fusion_status["hostname"]}"',
         ]
 
+    def append_info_metrics(self, metric_lines, fusion_status, base_label_values):
+        """Append Fusion info metrics."""
         info_label_values = [
-            f'apex_id="{apex_id}"',
-            f'apex_type="{apex_type}"',
-            f'apex_software="{apex_software}"',
-            f'apex_hardware="{apex_hardware}"',
-            f'apex_serial="{apex_serial}"',
-            f'apex_hostname="{apex_hostname}"',
+            f'apex_id="{fusion_status["_id"]}"',
+            f'apex_type="{fusion_status["type"]}"',
+            f'apex_software="{fusion_status["software"]}"',
+            f'apex_hardware="{fusion_status["hardware"]}"',
+            f'apex_serial="{fusion_status["serial"]}"',
+            f'apex_hostname="{fusion_status["hostname"]}"',
         ]
         metric_lines.append(self.prom_metric_string("info_label_values", info_label_values, 1))
 
@@ -235,6 +228,8 @@ class FUSION:
         for metric_name, metric_value in sd_card_data.items():
             metric_lines.append(self.prom_metric_string(metric_name, base_label_values, metric_value))
 
+    def append_input_metrics(self, metric_lines, fusion_status, base_label_values):
+        """Append current Fusion input measurements."""
         for apex_input in fusion_status["status"].get("inputs", []):
             input_label_values = [
                 'data_source="apex"',
@@ -247,19 +242,25 @@ class FUSION:
                 self.prom_metric_string("measurement", combined_labels, float(apex_input["value"]))
             )
 
+    def append_alarm_metrics(self, metric_lines, fusion_status, base_label_values):
+        """Append Fusion alarm state metrics."""
+        alarm_status = fusion_status["status"]["alarm"]["status"]
+        if alarm_status == "OFF":
+            alarm_value = 0
+        elif alarm_status == "ON":
+            alarm_value = 1
+        else:
+            alarm_value = 2
+
         alarm_labels = [
             f'alarm_description="{str(fusion_status["status"]["alarm"]["smnt"])}"',
             'alarm_values="1 is On, 0 is Off, 2 is metric issue"',
         ]
         combined_labels = base_label_values + alarm_labels
-        if fusion_status["status"]["alarm"]["status"] == "OFF":
-            alarm_value = 0
-        elif fusion_status["status"]["alarm"]["status"] == "ON":
-            alarm_value = 1
-        else:
-            alarm_value = 2
         metric_lines.append(self.prom_metric_string("alarm", combined_labels, alarm_value))
 
+    def append_module_metrics(self, metric_lines, fusion_status, base_label_values):
+        """Append module presence and state metrics."""
         for apex_module in fusion_status["status"].get("modules", []):
             module_labels = [
                 f'module_type="{apex_module["hwtype"]}"',
@@ -282,6 +283,8 @@ class FUSION:
                 )
             )
 
+    def append_network_metrics(self, metric_lines, fusion_status, base_label_values):
+        """Append network quality metrics."""
         metric_lines.append(
             self.prom_metric_string(
                 "network_quality_pct",
@@ -297,58 +300,70 @@ class FUSION:
             )
         )
 
-        fusion_measurement_log = self.get_measurement_log()
+    def parse_recent_measurement(self, log_entry):
+        """Normalize a measurement log entry if it is recent enough."""
+        log_date = log_entry["date"]
+        log_type = log_entry["type"]
+        log_name = log_entry["name"]
+        log_value = log_entry["value"]
+
+        try:
+            log_timestamp_utc = datetime.datetime.strptime(
+                f"{log_date}+0000", "%Y-%m-%dT%H:%M:%S.%fZ%z"
+            )
+            current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+                seconds=self.max_data_age
+            )
+        except ValueError:
+            log_timestamp_utc = datetime.datetime.strptime(str(log_date), "%Y-%m-%dT%H:%M:%S.%fZ")
+            current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC).replace(
+                tzinfo=None
+            ) - datetime.timedelta(seconds=self.max_data_age)
+
+        if log_timestamp_utc <= current_timestamp_delta_utc:
+            return None
+
+        if log_type in [1, 2, 3, 4, 5, 6]:
+            normalized_name = str(self.mlog_type_eval(log_type)).lower().replace(" ", "_")
+        elif log_type == 0:
+            normalized_name = str(log_name).lower().replace(" ", "_")
+        else:
+            return None
+
+        return {
+            "date": log_date,
+            "type": log_type,
+            "name": normalized_name,
+            "value": log_value,
+        }
+
+    def latest_measurements(self):
+        """Return the latest valid Fusion measurement entries by metric name."""
         latest_measurements = {}
-        for log_entry in fusion_measurement_log:
-            log_date = log_entry["date"]
-            log_type = log_entry["type"]
-            log_name = log_entry["name"]
-            log_value = log_entry["value"]
-
-            try:
-                log_timestamp_utc = datetime.datetime.strptime(
-                    f"{log_date}+0000", "%Y-%m-%dT%H:%M:%S.%fZ%z"
-                )
-                current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
-                    seconds=self.max_data_age
-                )
-            except ValueError:
-                log_timestamp_utc = datetime.datetime.strptime(str(log_date), "%Y-%m-%dT%H:%M:%S.%fZ")
-                current_timestamp_delta_utc = datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - datetime.timedelta(
-                    seconds=self.max_data_age
-                )
-
-            if log_timestamp_utc <= current_timestamp_delta_utc:
+        for log_entry in self.get_measurement_log():
+            normalized_entry = self.parse_recent_measurement(log_entry)
+            if normalized_entry is None:
                 continue
 
-            if log_type in [1, 2, 3, 4, 5, 6]:
-                log_name = str(self.mlog_type_eval(log_type)).lower().replace(" ", "_")
-            elif log_type in [0]:
-                log_name = str(log_name).lower().replace(" ", "_")
-            else:
-                continue
-
+            log_name = normalized_entry["name"]
             if log_name not in latest_measurements:
-                latest_measurements[log_name] = {
-                    "date": log_date,
-                    "type": log_type,
-                    "name": log_name,
-                    "value": log_value,
-                }
-            else:
-                current_ts_string = datetime.datetime.strptime(
-                    latest_measurements[log_name]["date"], "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
-                incoming_ts_string = datetime.datetime.strptime(log_date, "%Y-%m-%dT%H:%M:%S.%fZ")
-                if current_ts_string < incoming_ts_string:
-                    latest_measurements[log_name] = {
-                        "date": log_date,
-                        "type": log_type,
-                        "name": log_name,
-                        "value": log_value,
-                    }
+                latest_measurements[log_name] = normalized_entry
+                continue
 
-        for latest_measurement_item_dict in latest_measurements.values():
+            current_ts_string = datetime.datetime.strptime(
+                latest_measurements[log_name]["date"], "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
+            incoming_ts_string = datetime.datetime.strptime(
+                normalized_entry["date"], "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
+            if current_ts_string < incoming_ts_string:
+                latest_measurements[log_name] = normalized_entry
+
+        return latest_measurements
+
+    def append_latest_measurements(self, metric_lines, base_label_values):
+        """Append the newest measurement log values."""
+        for latest_measurement_item_dict in self.latest_measurements().values():
             log_entry_labels = [
                 'data_source="measurement_log"',
                 f'name="{latest_measurement_item_dict["name"]}"',
@@ -361,6 +376,19 @@ class FUSION:
                     float(latest_measurement_item_dict["value"]),
                 )
             )
+
+    def prometheus_metrics(self):
+        """Generate Prometheus metrics for Fusion."""
+        metric_lines = []
+        fusion_status = self.get_status()
+        base_label_values = self.base_label_values(fusion_status)
+
+        self.append_info_metrics(metric_lines, fusion_status, base_label_values)
+        self.append_input_metrics(metric_lines, fusion_status, base_label_values)
+        self.append_alarm_metrics(metric_lines, fusion_status, base_label_values)
+        self.append_module_metrics(metric_lines, fusion_status, base_label_values)
+        self.append_network_metrics(metric_lines, fusion_status, base_label_values)
+        self.append_latest_measurements(metric_lines, base_label_values)
 
         return "\n".join(metric_lines)
 
